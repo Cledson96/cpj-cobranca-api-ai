@@ -342,6 +342,28 @@ describe("ReviewExecutionRepository", () => {
           outputCostUsd: "0.00007",
           cacheReadTokens: 4,
         },
+        steps: [
+          {
+            id: "step-1",
+            executionId: "execution-1",
+            createdAt,
+            nodeName: "language_router",
+            kind: "system",
+            status: "success",
+            durationMs: 1,
+            errorMessage: null,
+          },
+          {
+            id: "step-2",
+            executionId: "execution-1",
+            createdAt,
+            nodeName: "security_agent",
+            kind: "llm",
+            status: "success",
+            durationMs: 200,
+            errorMessage: null,
+          },
+        ],
       },
     ]);
 
@@ -369,6 +391,20 @@ describe("ReviewExecutionRepository", () => {
           cost_output_usd: 0.00007,
           cache_read_tokens: 4,
         },
+        steps: [
+          {
+            node_name: "language_router",
+            kind: "system",
+            status: "success",
+            duration_ms: 1,
+          },
+          {
+            node_name: "security_agent",
+            kind: "llm",
+            status: "success",
+            duration_ms: 200,
+          },
+        ],
       },
     ]);
     expect(prisma.execution.findMany).toHaveBeenCalledWith({
@@ -384,6 +420,15 @@ describe("ReviewExecutionRepository", () => {
         cacheHit: true,
         sourceExecutionId: true,
         telemetry: true,
+        steps: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            nodeName: true,
+            kind: true,
+            status: true,
+            durationMs: true,
+          },
+        },
       },
     });
   });

@@ -31,6 +31,14 @@ export const historyStepSchema = z.object({
 });
 export type HistoryStep = z.infer<typeof historyStepSchema>;
 
+export const historyStepSummarySchema = z.object({
+  node_name: nonEmptyString,
+  kind: z.string().trim().min(1),
+  status: z.enum(["pending", "success", "failed"]),
+  duration_ms: z.number().int().min(0),
+});
+export type HistoryStepSummary = z.infer<typeof historyStepSummarySchema>;
+
 export const historyListItemSchema = z.object({
   id: nonEmptyString,
   type: z.string().trim().min(1),
@@ -40,6 +48,7 @@ export const historyListItemSchema = z.object({
   cache_hit: z.boolean(),
   source_execution_id: z.string().nullable(),
   telemetry: historyTelemetrySchema.nullable(),
+  steps: z.array(historyStepSummarySchema),
 });
 export type HistoryListItem = z.infer<typeof historyListItemSchema>;
 

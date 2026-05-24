@@ -24,6 +24,20 @@ const historyItem = {
     cost_output_usd: 0.00007,
     cache_read_tokens: 4,
   },
+  steps: [
+    {
+      node_name: "language_router",
+      kind: "system",
+      status: "success",
+      duration_ms: 1,
+    },
+    {
+      node_name: "security_agent",
+      kind: "llm",
+      status: "success",
+      duration_ms: 200,
+    },
+  ],
 };
 
 const historyDetail = {

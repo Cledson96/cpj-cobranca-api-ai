@@ -1,8 +1,10 @@
 import { ChatOpenRouter } from "@langchain/openrouter";
 import { z } from "zod";
 import { GenericError, handleUnknownError } from "@/infrastructure/errors";
-import type { AgentExecutionTelemetrySink, LlmRunTelemetry } from "../telemetry";
+import type { AgentExecutionTelemetrySink } from "../telemetry";
 import type { GenerationStatsClient } from "./openrouter-generation-stats.client";
+import { OpenRouterTelemetryCallback } from "./openrouter-telemetry.callback";
+import { extractOpenRouterTelemetry } from "./openrouter-telemetry.extractor";
 
 export type StructuredOutputData = Record<string, unknown>;
 
@@ -77,7 +79,10 @@ export class LangChainStructuredOutputRunner implements StructuredOutputRunner {
         input.schema,
         createStructuredOutputConfig(input.schemaName),
       );
-      const rawOutput = await structuredModel.invoke(input.messages);
+      const telemetryCallback = new OpenRouterTelemetryCallback();
+      const rawOutput = await structuredModel.invoke(input.messages, {
+        callbacks: [telemetryCallback],
+      });
       const structuredOutput = rawStructuredOutputSchema.safeParse(rawOutput);
 
       if (!structuredOutput.success) {
@@ -90,7 +95,10 @@ export class LangChainStructuredOutputRunner implements StructuredOutputRunner {
         throw new GenericError(`Saida estruturada invalida para ${input.schemaName}.`, parsed.error);
       }
 
-      await this.recordTelemetry(structuredOutput.data.raw);
+      await this.recordTelemetry({
+        raw: structuredOutput.data.raw,
+        llmOutput: telemetryCallback.llmOutput(),
+      });
 
       return parsed.data;
     } catch (error) {
@@ -98,18 +106,25 @@ export class LangChainStructuredOutputRunner implements StructuredOutputRunner {
     }
   }
 
-  private async recordTelemetry(raw: z.infer<typeof rawMessageSchema>): Promise<void> {
+  private async recordTelemetry(input: {
+    raw: z.infer<typeof rawMessageSchema>;
+    llmOutput: unknown;
+  }): Promise<void> {
     if (!this.options?.telemetrySink) {
       return;
     }
 
-    const fallback = this.extractTelemetry(raw);
+    const fallback = extractOpenRouterTelemetry({
+      modelRequested: this.options.modelRequested,
+      raw: input.raw,
+      llmOutput: input.llmOutput,
+    });
     const telemetry = fallback.generationId && this.options.generationStatsClient
       ? await this.options.generationStatsClient.fetchTelemetry({
           generationId: fallback.generationId,
           modelRequested: this.options.modelRequested,
-          fallback,
-        })
+        fallback,
+      })
       : fallback;
 
     this.options.telemetrySink.record({
@@ -118,24 +133,4 @@ export class LangChainStructuredOutputRunner implements StructuredOutputRunner {
       ...telemetry,
     });
   }
-
-  private extractTelemetry(raw: z.infer<typeof rawMessageSchema>): Partial<LlmRunTelemetry> {
-    const metadata = raw.response_metadata ?? {};
-    const usage = raw.usage_metadata;
-
-    return {
-      generationId: raw.id ?? readString(metadata, "id") ?? readString(metadata, "generation_id"),
-      modelUsed: readString(metadata, "model_name") ?? readString(metadata, "model"),
-      promptTokens: usage?.input_tokens ?? null,
-      completionTokens: usage?.output_tokens ?? null,
-      totalTokens: usage?.total_tokens ?? null,
-      cacheReadTokens: usage?.input_token_details?.cache_read ?? null,
-    };
-  }
-}
-
-function readString(input: Record<string, unknown>, key: string): string | null {
-  const value = input[key];
-
-  return typeof value === "string" && value.trim() ? value : null;
 }

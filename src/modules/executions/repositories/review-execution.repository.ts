@@ -117,6 +117,15 @@ export class ReviewExecutionRepository {
         cacheHit: true,
         sourceExecutionId: true,
         telemetry: true,
+        steps: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            nodeName: true,
+            kind: true,
+            status: true,
+            durationMs: true,
+          },
+        },
       },
     });
 
@@ -144,6 +153,7 @@ function mapReviewExecutionListItem(execution: ReviewExecutionRecord): ReviewExe
     cache_hit: execution.cacheHit,
     source_execution_id: execution.sourceExecutionId,
     telemetry: mapReviewExecutionTelemetry(execution.telemetry),
+    steps: Array.isArray(execution.steps) ? execution.steps.map(mapReviewExecutionStepSummary) : [],
   };
 }
 
@@ -178,6 +188,15 @@ function mapReviewExecutionStep(input: NonNullable<ReviewExecutionRecord["steps"
     input_payload: input.inputPayload ?? null,
     output_payload: input.outputPayload ?? null,
     error_message: input.errorMessage ?? null,
+  };
+}
+
+function mapReviewExecutionStepSummary(input: NonNullable<ReviewExecutionRecord["steps"]>[number]) {
+  return {
+    node_name: input.nodeName,
+    kind: input.kind,
+    status: input.status,
+    duration_ms: input.durationMs,
   };
 }
 

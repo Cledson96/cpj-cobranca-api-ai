@@ -145,6 +145,13 @@ export type ReviewExecutionStep = {
   error_message: string | null;
 };
 
+export type ReviewExecutionStepSummary = {
+  node_name: string;
+  kind: ExecutionStepKind;
+  status: ExecutionStatus;
+  duration_ms: number;
+};
+
 export type ReviewExecution = {
   id: string;
   type: ReviewFlowType;
@@ -163,4 +170,6 @@ export type ReviewExecution = {
 export type ReviewExecutionListItem = Omit<
   ReviewExecution,
   "input_payload" | "output_payload" | "error_message" | "steps"
->;
+> & {
+  steps: ReviewExecutionStepSummary[];
+};
