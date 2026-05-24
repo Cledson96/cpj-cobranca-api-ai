@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import {
   type ReviewLanguageGraphContext,
@@ -18,13 +19,21 @@ const reviewInput: ReviewRequest = {
   language: "typescript",
 };
 
+const userPayloadSchema = z.record(z.string(), z.unknown());
+
 class FakeStructuredOutputRunner implements StructuredOutputRunner {
-  readonly messages: AgentMessage[][] = [];
+  readonly calls: Array<{
+    schemaName: string;
+    messages: AgentMessage[];
+  }> = [];
 
   async run<TOutput extends Record<string, unknown>>(
     input: StructuredOutputRunnerInput<TOutput>,
   ): Promise<TOutput> {
-    this.messages.push(input.messages);
+    this.calls.push({
+      schemaName: input.schemaName,
+      messages: input.messages,
+    });
 
     if (input.schemaName === "ReviewAggregatorOutput") {
       return input.schema.parse({
@@ -66,7 +75,11 @@ describe("ReviewLanguageGraph steps", () => {
 
     await graph.invoke(reviewInput, context);
 
-    expect(recorder.steps.map((step) => step.nodeName)).toEqual([
+    const nodeNames = recorder.steps.map((step) => step.nodeName);
+
+    expect(nodeNames[0]).toBe("deterministic_tools");
+    expect(nodeNames.at(-1)).toBe("review_aggregator_agent");
+    expect(nodeNames).toEqual(expect.arrayContaining([
       "deterministic_tools",
       "naming_clarity_agent",
       "error_handling_agent",
@@ -74,11 +87,45 @@ describe("ReviewLanguageGraph steps", () => {
       "complexity_agent",
       "security_agent",
       "review_aggregator_agent",
-    ]);
+    ]));
     expect(recorder.steps.every((step) => step.executionId === "execution-1")).toBe(true);
     expect(recorder.steps.every((step) => step.status === "success")).toBe(true);
     expect(recorder.steps[0]?.kind).toBe("tool");
-    expect(recorder.steps[1]?.kind).toBe("llm");
-    expect(recorder.steps[6]?.kind).toBe("llm");
+    expect(recorder.steps.slice(1).every((step) => step.kind === "llm")).toBe(true);
+  });
+
+  it("mantem especialistas isolados e envia todas as saidas ao agregador", async () => {
+    const runner = new FakeStructuredOutputRunner();
+    const graph = new ReviewTypeScriptGraph(runner);
+    const context: ReviewLanguageGraphContext = {
+      languageProfile: new TypeScriptLanguageProfile(),
+    };
+
+    await graph.invoke(reviewInput, context);
+
+    const specialistCalls = runner.calls.filter((call) => call.schemaName !== "ReviewAggregatorOutput");
+    const aggregatorCall = runner.calls.find((call) => call.schemaName === "ReviewAggregatorOutput");
+
+    expect(specialistCalls).toHaveLength(5);
+    for (const call of specialistCalls) {
+      expect(readUserPayload(call.messages).saidas_agentes_anteriores).toEqual([]);
+    }
+    expect(aggregatorCall).toBeDefined();
+    expect(readUserPayload(aggregatorCall?.messages ?? []).saidas_especialistas).toHaveLength(5);
   });
 });
+
+function readUserPayload(messages: AgentMessage[]): Record<string, unknown> {
+  const message = messages.find((item) => item.role === "user");
+  if (!message) {
+    return {};
+  }
+
+  const parsed: unknown = JSON.parse(message.content);
+  const result = userPayloadSchema.safeParse(parsed);
+  if (result.success) {
+    return result.data;
+  }
+
+  return {};
+}

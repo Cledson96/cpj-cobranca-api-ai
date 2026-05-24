@@ -5,15 +5,21 @@ import {
   specialistAgentOutputSchema,
   type SpecialistAgentOutput,
 } from "../models";
+import { ReviewPromptCatalog, type SpecialistPromptKey } from "../prompts";
 
 export abstract class ReviewSpecialistAgent extends BaseSpecialistAgent<
   SpecialistAgentOutput,
   ReviewAnalysisContext
 > {
+  private readonly promptCatalog: ReviewPromptCatalog;
+  private readonly promptKey: SpecialistPromptKey;
+
   protected constructor(input: {
     name: string;
     outputSchemaName: string;
+    promptKey: SpecialistPromptKey;
     runner: StructuredOutputRunner;
+    promptCatalog?: ReviewPromptCatalog;
   }) {
     super({
       name: input.name,
@@ -21,6 +27,15 @@ export abstract class ReviewSpecialistAgent extends BaseSpecialistAgent<
       outputSchemaName: input.outputSchemaName,
       runner: input.runner,
     });
+    this.promptKey = input.promptKey;
+    this.promptCatalog = input.promptCatalog ?? ReviewPromptCatalog.default();
+  }
+
+  protected buildSystemPrompt(context: ReviewAnalysisContext): string {
+    return this.promptCatalog.getSpecialistSystemPrompt(
+      this.promptKey,
+      context.languageProfile.toPromptContext(),
+    );
   }
 
   protected buildUserPrompt(context: ReviewAnalysisContext): string {
@@ -30,20 +45,10 @@ export abstract class ReviewSpecialistAgent extends BaseSpecialistAgent<
         contexto_usuario: context.input.context ?? null,
         codigo: context.input.code,
         achados_deterministicos: context.deterministicFindings,
-        saidas_agentes_anteriores: context.agentOutputs,
+        saidas_agentes_anteriores: [],
       },
       null,
       2,
     );
-  }
-
-  protected specialistInstructions(focus: string): string {
-    return [
-      "Voce e um agente especialista de code review.",
-      "Responda somente no schema estruturado solicitado.",
-      "Nao invente linha exata quando nao houver evidencia; use line_hint como null.",
-      "Classifique severidade como low, medium ou high.",
-      `Foco principal: ${focus}.`,
-    ].join("\n");
   }
 }

@@ -2,25 +2,25 @@ import { BaseSpecialistAgent } from "@/modules/agent";
 import type { StructuredOutputRunner } from "@/modules/agent/llm";
 import { reviewResponseSchema, type ReviewResponse } from "@shared";
 import type { ReviewAnalysisContext } from "../models";
+import { ReviewPromptCatalog } from "../prompts";
 
 export class ReviewAggregatorAgent extends BaseSpecialistAgent<ReviewResponse, ReviewAnalysisContext> {
-  constructor(runner: StructuredOutputRunner) {
+  private readonly promptCatalog: ReviewPromptCatalog;
+
+  constructor(runner: StructuredOutputRunner, promptCatalog?: ReviewPromptCatalog) {
     super({
       name: "review_aggregator",
       outputSchema: reviewResponseSchema,
       outputSchemaName: "ReviewAggregatorOutput",
       runner,
     });
+    this.promptCatalog = promptCatalog ?? ReviewPromptCatalog.default();
   }
 
   protected buildSystemPrompt(context: ReviewAnalysisContext): string {
-    return [
-      "Voce e o agente agregador final de code review.",
-      "Consolide os achados dos especialistas em uma resposta unica no contrato publico da API.",
-      "Nao duplique issues equivalentes.",
-      "Use score de 0 a 10 e overall_quality como good, needs_improvement ou critical.",
+    return this.promptCatalog.getAggregatorSystemPrompt(
       context.languageProfile.toPromptContext(),
-    ].join("\n\n");
+    );
   }
 
   protected buildUserPrompt(context: ReviewAnalysisContext): string {

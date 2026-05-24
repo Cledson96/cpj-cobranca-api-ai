@@ -17,6 +17,7 @@ import type {
   ReviewFinding,
   SpecialistAgentOutput,
 } from "../models";
+import { ReviewPromptCatalog } from "../prompts";
 import { DeterministicReviewToolsRunner } from "../tools";
 import type { LanguageProfile } from "../language";
 import type { ReviewStepRecorder } from "./review-flow.graph";
@@ -97,11 +98,17 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
       .addNode("review_aggregator_agent", this.runReviewAggregatorAgent)
       .addEdge(START, "deterministic_tools")
       .addEdge("deterministic_tools", "naming_clarity_agent")
-      .addEdge("naming_clarity_agent", "error_handling_agent")
-      .addEdge("error_handling_agent", "resource_leak_agent")
-      .addEdge("resource_leak_agent", "complexity_agent")
-      .addEdge("complexity_agent", "security_agent")
-      .addEdge("security_agent", "review_aggregator_agent")
+      .addEdge("deterministic_tools", "error_handling_agent")
+      .addEdge("deterministic_tools", "resource_leak_agent")
+      .addEdge("deterministic_tools", "complexity_agent")
+      .addEdge("deterministic_tools", "security_agent")
+      .addEdge([
+        "naming_clarity_agent",
+        "error_handling_agent",
+        "resource_leak_agent",
+        "complexity_agent",
+        "security_agent",
+      ], "review_aggregator_agent")
       .addEdge("review_aggregator_agent", END)
       .compile();
   }
@@ -271,13 +278,15 @@ function getErrorMessage(error: unknown): string | null {
 export function createReviewLanguageGraphAgents(
   runner: ConstructorParameters<typeof NamingClarityAgent>[0],
 ): ReviewLanguageGraphAgents {
+  const promptCatalog = ReviewPromptCatalog.default();
+
   return {
-    namingClarityAgent: new NamingClarityAgent(runner),
-    errorHandlingAgent: new ErrorHandlingAgent(runner),
-    resourceLeakAgent: new ResourceLeakAgent(runner),
-    complexityAgent: new ComplexityAgent(runner),
-    securityAgent: new SecurityAgent(runner),
-    reviewAggregatorAgent: new ReviewAggregatorAgent(runner),
+    namingClarityAgent: new NamingClarityAgent(runner, promptCatalog),
+    errorHandlingAgent: new ErrorHandlingAgent(runner, promptCatalog),
+    resourceLeakAgent: new ResourceLeakAgent(runner, promptCatalog),
+    complexityAgent: new ComplexityAgent(runner, promptCatalog),
+    securityAgent: new SecurityAgent(runner, promptCatalog),
+    reviewAggregatorAgent: new ReviewAggregatorAgent(runner, promptCatalog),
     toolsRunner: new DeterministicReviewToolsRunner(),
   };
 }

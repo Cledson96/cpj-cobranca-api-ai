@@ -1,21 +1,15 @@
 import type { StructuredOutputRunner } from "@/modules/agent/llm";
-import type { ReviewAnalysisContext } from "../models";
+import type { ReviewPromptCatalog } from "../prompts";
 import { ReviewSpecialistAgent } from "./review-specialist.agent";
 
 export class SecurityAgent extends ReviewSpecialistAgent {
-  constructor(runner: StructuredOutputRunner) {
+  constructor(runner: StructuredOutputRunner, promptCatalog?: ReviewPromptCatalog) {
     super({
       name: "security",
       outputSchemaName: "SecurityAgentOutput",
+      promptKey: "security",
       runner,
+      promptCatalog,
     });
-  }
-
-  protected buildSystemPrompt(context: ReviewAnalysisContext): string {
-    return [
-      this.specialistInstructions("padroes comuns de seguranca e exposicao indevida de dados"),
-      context.languageProfile.toPromptContext(),
-      "Procure SQL injection, command injection, logs sensiveis, eval, entrada externa sem validacao e segredos hardcoded.",
-    ].join("\n\n");
   }
 }
