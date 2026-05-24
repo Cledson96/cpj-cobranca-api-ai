@@ -47,7 +47,6 @@ const ReviewLanguageAnnotation = Annotation.Root({
   input: Annotation<ReviewRequest>,
   languageProfile: Annotation<LanguageProfile>,
   executionId: Annotation<string | undefined>,
-  stepRecorder: Annotation<ReviewStepRecorder | undefined>,
   deterministicFindings: Annotation<ReviewFinding[]>({
     reducer: (_left: ReviewFinding[], right: ReviewFinding[]) => right,
     default: () => [],
@@ -72,12 +71,11 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
   }
 
   async invoke(input: ReviewRequest, context: ReviewLanguageGraphContext): Promise<ReviewResponse> {
-    const graph = this.buildGraph();
+    const graph = this.buildGraph(context.stepRecorder);
     const state = await graph.invoke({
       input,
       languageProfile: context.languageProfile,
       executionId: context.executionId,
-      stepRecorder: context.stepRecorder,
     });
 
     if (!state.output) {
@@ -87,15 +85,15 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
     return state.output;
   }
 
-  private buildGraph() {
+  private buildGraph(stepRecorder?: ReviewStepRecorder) {
     return new StateGraph(ReviewLanguageAnnotation)
-      .addNode("deterministic_tools", this.runDeterministicTools)
-      .addNode("naming_clarity_agent", this.runNamingClarityAgent)
-      .addNode("error_handling_agent", this.runErrorHandlingAgent)
-      .addNode("resource_leak_agent", this.runResourceLeakAgent)
-      .addNode("complexity_agent", this.runComplexityAgent)
-      .addNode("security_agent", this.runSecurityAgent)
-      .addNode("review_aggregator_agent", this.runReviewAggregatorAgent)
+      .addNode("deterministic_tools", (state) => this.runDeterministicTools(state, stepRecorder))
+      .addNode("naming_clarity_agent", (state) => this.runNamingClarityAgent(state, stepRecorder))
+      .addNode("error_handling_agent", (state) => this.runErrorHandlingAgent(state, stepRecorder))
+      .addNode("resource_leak_agent", (state) => this.runResourceLeakAgent(state, stepRecorder))
+      .addNode("complexity_agent", (state) => this.runComplexityAgent(state, stepRecorder))
+      .addNode("security_agent", (state) => this.runSecurityAgent(state, stepRecorder))
+      .addNode("review_aggregator_agent", (state) => this.runReviewAggregatorAgent(state, stepRecorder))
       .addEdge(START, "deterministic_tools")
       .addEdge("deterministic_tools", "naming_clarity_agent")
       .addEdge("deterministic_tools", "error_handling_agent")
@@ -113,10 +111,13 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
       .compile();
   }
 
-  private readonly runDeterministicTools = async (state: ReviewLanguageState) => {
+  private readonly runDeterministicTools = async (
+    state: ReviewLanguageState,
+    stepRecorder?: ReviewStepRecorder,
+  ) => {
     const output = this.agents.toolsRunner.run(state.input);
 
-    await this.recordStep(state, {
+    await this.recordStep(state, stepRecorder, {
       nodeName: "deterministic_tools",
       kind: "tool",
       inputPayload: {
@@ -132,28 +133,46 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
     };
   };
 
-  private readonly runNamingClarityAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist("naming_clarity_agent", this.agents.namingClarityAgent, state);
+  private readonly runNamingClarityAgent = async (
+    state: ReviewLanguageState,
+    stepRecorder?: ReviewStepRecorder,
+  ) => {
+    return this.runSpecialist("naming_clarity_agent", this.agents.namingClarityAgent, state, stepRecorder);
   };
 
-  private readonly runErrorHandlingAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist("error_handling_agent", this.agents.errorHandlingAgent, state);
+  private readonly runErrorHandlingAgent = async (
+    state: ReviewLanguageState,
+    stepRecorder?: ReviewStepRecorder,
+  ) => {
+    return this.runSpecialist("error_handling_agent", this.agents.errorHandlingAgent, state, stepRecorder);
   };
 
-  private readonly runResourceLeakAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist("resource_leak_agent", this.agents.resourceLeakAgent, state);
+  private readonly runResourceLeakAgent = async (
+    state: ReviewLanguageState,
+    stepRecorder?: ReviewStepRecorder,
+  ) => {
+    return this.runSpecialist("resource_leak_agent", this.agents.resourceLeakAgent, state, stepRecorder);
   };
 
-  private readonly runComplexityAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist("complexity_agent", this.agents.complexityAgent, state);
+  private readonly runComplexityAgent = async (
+    state: ReviewLanguageState,
+    stepRecorder?: ReviewStepRecorder,
+  ) => {
+    return this.runSpecialist("complexity_agent", this.agents.complexityAgent, state, stepRecorder);
   };
 
-  private readonly runSecurityAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist("security_agent", this.agents.securityAgent, state);
+  private readonly runSecurityAgent = async (
+    state: ReviewLanguageState,
+    stepRecorder?: ReviewStepRecorder,
+  ) => {
+    return this.runSpecialist("security_agent", this.agents.securityAgent, state, stepRecorder);
   };
 
-  private readonly runReviewAggregatorAgent = async (state: ReviewLanguageState) => {
-    const output = await this.runRecordedOperation(state, {
+  private readonly runReviewAggregatorAgent = async (
+    state: ReviewLanguageState,
+    stepRecorder?: ReviewStepRecorder,
+  ) => {
+    const output = await this.runRecordedOperation(state, stepRecorder, {
       nodeName: "review_aggregator_agent",
       kind: "llm",
       inputPayload: this.createContextPayload(state),
@@ -169,8 +188,9 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
     nodeName: string,
     agent: ReviewSpecialistAgent,
     state: ReviewLanguageState,
+    stepRecorder?: ReviewStepRecorder,
   ) {
-    const output = await this.runRecordedOperation(state, {
+    const output = await this.runRecordedOperation(state, stepRecorder, {
       nodeName,
       kind: "llm",
       inputPayload: this.createContextPayload(state),
@@ -201,6 +221,7 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
 
   private async runRecordedOperation<TOutput>(
     state: ReviewLanguageState,
+    stepRecorder: ReviewStepRecorder | undefined,
     input: {
       nodeName: string;
       kind: RecordReviewExecutionStepInput["kind"];
@@ -212,7 +233,7 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
 
     try {
       const output = await input.operation();
-      await this.recordStep(state, {
+      await this.recordStep(state, stepRecorder, {
         nodeName: input.nodeName,
         kind: input.kind,
         inputPayload: input.inputPayload,
@@ -222,7 +243,7 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
 
       return output;
     } catch (error) {
-      await this.recordStep(state, {
+      await this.recordStep(state, stepRecorder, {
         nodeName: input.nodeName,
         kind: input.kind,
         inputPayload: input.inputPayload,
@@ -235,6 +256,7 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
 
   private async recordStep(
     state: ReviewLanguageState,
+    stepRecorder: ReviewStepRecorder | undefined,
     input: {
       nodeName: string;
       kind: RecordReviewExecutionStepInput["kind"];
@@ -244,13 +266,13 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
       error?: unknown;
     },
   ): Promise<void> {
-    if (!state.executionId || !state.stepRecorder) {
+    if (!state.executionId || !stepRecorder) {
       return;
     }
 
     const errorMessage = getErrorMessage(input.error);
 
-    await state.stepRecorder.recordStep({
+    await stepRecorder.recordStep({
       executionId: state.executionId,
       nodeName: input.nodeName,
       kind: input.kind,

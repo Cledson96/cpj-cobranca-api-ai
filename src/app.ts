@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import { prismaPlugin } from "@/infrastructure/database";
+import { createFastifyLoggerOptions } from "@/infrastructure/logging";
 import { OpenApiPlugin } from "@/infrastructure/openapi";
 import { HealthRoutes } from "@/modules/health/routes";
 import { HistoryRoutes, type HistoryRoutesDependencies } from "@/modules/history";
@@ -28,9 +29,7 @@ export class App {
     this.env = options.env ?? loadEnv();
     this.app = Fastify({
       bodyLimit: this.env.BODY_LIMIT_BYTES,
-      logger: {
-        level: this.env.LOG_LEVEL,
-      },
+      logger: createFastifyLoggerOptions(this.env),
       requestTimeout: this.env.REQUEST_TIMEOUT_MS,
       ...options.serverOptions,
     });

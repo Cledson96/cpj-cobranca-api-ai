@@ -79,6 +79,9 @@ model ExecutionTelemetry {
   completionTokens Int?
   totalTokens      Int?
   costUsd          Decimal?  @db.Decimal(12, 8)
+  inputCostUsd     Decimal?  @db.Decimal(12, 8)
+  outputCostUsd    Decimal?  @db.Decimal(12, 8)
+  cacheReadTokens  Int?
   createdAt        DateTime  @default(now())
   execution        Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 }

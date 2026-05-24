@@ -29,6 +29,9 @@ function createRepository() {
     executionStep: {
       create: vi.fn(),
     },
+    executionTelemetry: {
+      upsert: vi.fn(),
+    },
   };
 
   return {
@@ -168,6 +171,59 @@ describe("ReviewExecutionRepository", () => {
     });
   });
 
+  it("registra telemetria da execucao de review", async () => {
+    const { prisma, repository } = createRepository();
+    prisma.executionTelemetry.upsert.mockResolvedValue({
+      id: "telemetry-1",
+    });
+
+    await repository.recordTelemetry({
+      executionId: "execution-1",
+      provider: "openrouter",
+      modelRequested: "openai/gpt-4o-mini",
+      modelUsed: "openai/gpt-4o-mini",
+      langsmithRunId: "gen-1",
+      promptTokens: 100,
+      completionTokens: 20,
+      totalTokens: 120,
+      costUsd: "0.0001",
+      inputCostUsd: "0.00003",
+      outputCostUsd: "0.00007",
+      cacheReadTokens: 4,
+    });
+
+    expect(prisma.executionTelemetry.upsert).toHaveBeenCalledWith({
+      where: { executionId: "execution-1" },
+      create: {
+        executionId: "execution-1",
+        provider: "openrouter",
+        modelRequested: "openai/gpt-4o-mini",
+        modelUsed: "openai/gpt-4o-mini",
+        langsmithRunId: "gen-1",
+        promptTokens: 100,
+        completionTokens: 20,
+        totalTokens: 120,
+        costUsd: "0.0001",
+        inputCostUsd: "0.00003",
+        outputCostUsd: "0.00007",
+        cacheReadTokens: 4,
+      },
+      update: {
+        provider: "openrouter",
+        modelRequested: "openai/gpt-4o-mini",
+        modelUsed: "openai/gpt-4o-mini",
+        langsmithRunId: "gen-1",
+        promptTokens: 100,
+        completionTokens: 20,
+        totalTokens: 120,
+        costUsd: "0.0001",
+        inputCostUsd: "0.00003",
+        outputCostUsd: "0.00007",
+        cacheReadTokens: 4,
+      },
+    });
+  });
+
   it("busca detalhe de execucao por id", async () => {
     const { prisma, repository } = createRepository();
     prisma.execution.findUnique.mockResolvedValue({
@@ -182,6 +238,33 @@ describe("ReviewExecutionRepository", () => {
       cacheHit: false,
       sourceExecutionId: null,
       errorMessage: null,
+      telemetry: {
+        provider: "openrouter",
+        modelRequested: "openai/gpt-4o-mini",
+        modelUsed: "openai/gpt-4o-mini",
+        langsmithRunId: "gen-1",
+        promptTokens: 100,
+        completionTokens: 20,
+        totalTokens: 120,
+        costUsd: "0.0001",
+        inputCostUsd: "0.00003",
+        outputCostUsd: "0.00007",
+        cacheReadTokens: 4,
+      },
+      steps: [
+        {
+          id: "step-1",
+          executionId: "execution-1",
+          createdAt,
+          nodeName: "security_agent",
+          kind: "llm",
+          status: "success",
+          inputPayload: { language: "typescript" },
+          outputPayload: { findings: [] },
+          durationMs: 200,
+          errorMessage: null,
+        },
+      ],
     });
 
     const detail = await repository.findById("execution-1");
@@ -197,6 +280,41 @@ describe("ReviewExecutionRepository", () => {
       input_payload: reviewInput,
       output_payload: reviewOutput,
       error_message: null,
+      telemetry: {
+        provider: "openrouter",
+        model_requested: "openai/gpt-4o-mini",
+        model_used: "openai/gpt-4o-mini",
+        langsmith_run_id: "gen-1",
+        prompt_tokens: 100,
+        completion_tokens: 20,
+        total_tokens: 120,
+        cost_total_usd: 0.0001,
+        cost_input_usd: 0.00003,
+        cost_output_usd: 0.00007,
+        cache_read_tokens: 4,
+      },
+      steps: [
+        {
+          id: "step-1",
+          timestamp: "2026-05-24T12:30:45-03:00",
+          node_name: "security_agent",
+          kind: "llm",
+          status: "success",
+          duration_ms: 200,
+          input_payload: { language: "typescript" },
+          output_payload: { findings: [] },
+          error_message: null,
+        },
+      ],
+    });
+    expect(prisma.execution.findUnique).toHaveBeenCalledWith({
+      where: { id: "execution-1", flowType: "review" },
+      include: {
+        telemetry: true,
+        steps: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
     });
   });
 
@@ -211,6 +329,19 @@ describe("ReviewExecutionRepository", () => {
         durationMs: 1200,
         cacheHit: true,
         sourceExecutionId: "execution-0",
+        telemetry: {
+          provider: "openrouter",
+          modelRequested: "openai/gpt-4o-mini",
+          modelUsed: "openai/gpt-4o-mini",
+          langsmithRunId: "gen-1",
+          promptTokens: 100,
+          completionTokens: 20,
+          totalTokens: 120,
+          costUsd: "0.0001",
+          inputCostUsd: "0.00003",
+          outputCostUsd: "0.00007",
+          cacheReadTokens: 4,
+        },
       },
     ]);
 
@@ -225,6 +356,19 @@ describe("ReviewExecutionRepository", () => {
         duration_ms: 1200,
         cache_hit: true,
         source_execution_id: "execution-0",
+        telemetry: {
+          provider: "openrouter",
+          model_requested: "openai/gpt-4o-mini",
+          model_used: "openai/gpt-4o-mini",
+          langsmith_run_id: "gen-1",
+          prompt_tokens: 100,
+          completion_tokens: 20,
+          total_tokens: 120,
+          cost_total_usd: 0.0001,
+          cost_input_usd: 0.00003,
+          cost_output_usd: 0.00007,
+          cache_read_tokens: 4,
+        },
       },
     ]);
     expect(prisma.execution.findMany).toHaveBeenCalledWith({
@@ -239,6 +383,7 @@ describe("ReviewExecutionRepository", () => {
         durationMs: true,
         cacheHit: true,
         sourceExecutionId: true,
+        telemetry: true,
       },
     });
   });

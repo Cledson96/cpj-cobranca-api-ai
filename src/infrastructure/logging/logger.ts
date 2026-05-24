@@ -1,4 +1,4 @@
-import type { FastifyBaseLogger } from "fastify";
+import type { FastifyBaseLogger, FastifyServerOptions } from "fastify";
 
 const sensitiveKeys = new Set([
   "api_key",
@@ -18,6 +18,31 @@ const sensitiveKeys = new Set([
 ]);
 
 export type LogContext = Record<string, unknown>;
+export type LoggerEnv = {
+  NODE_ENV: "development" | "test" | "production";
+  LOG_LEVEL: "trace" | "debug" | "info" | "warn" | "error" | "fatal" | "silent";
+};
+
+export function createFastifyLoggerOptions(env: LoggerEnv): FastifyServerOptions["logger"] {
+  if (env.NODE_ENV !== "development") {
+    return {
+      level: env.LOG_LEVEL,
+    };
+  }
+
+  return {
+    level: env.LOG_LEVEL,
+    transport: {
+      target: "pino-pretty",
+      options: {
+        colorize: true,
+        ignore: "pid,hostname",
+        singleLine: true,
+        translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
+      },
+    },
+  };
+}
 
 export function maskSensitiveData(value: unknown, depth = 0): unknown {
   if (depth > 10 || value === null || value === undefined) {

@@ -6,9 +6,11 @@ import type {
   CreatePendingReviewExecutionInput,
   MarkReviewExecutionFailedInput,
   MarkReviewExecutionSuccessInput,
+  RecordReviewExecutionTelemetryInput,
   RecordReviewExecutionStepInput,
   ReviewExecutionRecord,
 } from "@/modules/executions";
+import type { AgentExecutionTelemetrySource } from "@/modules/agent";
 
 const reviewInput: ReviewRequest = {
   code: "export async function main() { return 1; }",
@@ -50,6 +52,7 @@ class FakeReviewExecutionPersistence implements ReviewExecutionPersistence {
   readonly successInputs: MarkReviewExecutionSuccessInput[] = [];
   readonly failedInputs: MarkReviewExecutionFailedInput[] = [];
   readonly stepInputs: RecordReviewExecutionStepInput[] = [];
+  readonly telemetryInputs: RecordReviewExecutionTelemetryInput[] = [];
 
   async createPending(input: CreatePendingReviewExecutionInput): Promise<ReviewExecutionRecord> {
     this.pendingInputs.push(input);
@@ -108,13 +111,36 @@ class FakeReviewExecutionPersistence implements ReviewExecutionPersistence {
   async recordStep(input: RecordReviewExecutionStepInput): Promise<void> {
     this.stepInputs.push(input);
   }
+
+  async recordTelemetry(input: RecordReviewExecutionTelemetryInput): Promise<void> {
+    this.telemetryInputs.push(input);
+  }
+}
+
+class FakeTelemetrySource implements AgentExecutionTelemetrySource {
+  snapshot() {
+    return {
+      provider: "openrouter",
+      modelRequested: "openai/gpt-4o-mini",
+      modelUsed: "openai/gpt-4o-mini",
+      generationIds: ["gen-1"],
+      promptTokens: 100,
+      completionTokens: 20,
+      totalTokens: 120,
+      costUsd: 0.0001,
+      inputCostUsd: 0.00003,
+      outputCostUsd: 0.00007,
+      cacheReadTokens: 4,
+    };
+  }
 }
 
 describe("ReviewEngine com persistencia", () => {
   it("cria execucao pendente, envia contexto ao grafo e marca sucesso", async () => {
     const graph = new FakeReviewGraph();
     const persistence = new FakeReviewExecutionPersistence();
-    const engine = new ReviewEngine(graph, persistence);
+    const telemetrySource = new FakeTelemetrySource();
+    const engine = new ReviewEngine(graph, persistence, telemetrySource);
 
     const output = await engine.execute(reviewInput);
 
@@ -128,6 +154,22 @@ describe("ReviewEngine com persistencia", () => {
     expect(persistence.successInputs[0]?.id).toBe("execution-1");
     expect(persistence.successInputs[0]?.outputPayload).toEqual(reviewOutput);
     expect(persistence.successInputs[0]?.durationMs).toBeGreaterThanOrEqual(0);
+    expect(persistence.telemetryInputs).toEqual([
+      {
+        executionId: "execution-1",
+        provider: "openrouter",
+        modelRequested: "openai/gpt-4o-mini",
+        modelUsed: "openai/gpt-4o-mini",
+        langsmithRunId: "gen-1",
+        promptTokens: 100,
+        completionTokens: 20,
+        totalTokens: 120,
+        costUsd: "0.0001",
+        inputCostUsd: "0.00003",
+        outputCostUsd: "0.00007",
+        cacheReadTokens: 4,
+      },
+    ]);
     expect(persistence.failedInputs).toHaveLength(0);
   });
 

@@ -11,6 +11,19 @@ const historyItem = {
   duration_ms: 1200,
   cache_hit: false,
   source_execution_id: null,
+  telemetry: {
+    provider: "openrouter",
+    model_requested: "openai/gpt-4o-mini",
+    model_used: "openai/gpt-4o-mini",
+    langsmith_run_id: "gen-1",
+    prompt_tokens: 100,
+    completion_tokens: 20,
+    total_tokens: 120,
+    cost_total_usd: 0.0001,
+    cost_input_usd: 0.00003,
+    cost_output_usd: 0.00007,
+    cache_read_tokens: 4,
+  },
 };
 
 const historyDetail = {
@@ -27,6 +40,19 @@ const historyDetail = {
     summary: "Sem problemas relevantes.",
   },
   error_message: null,
+  steps: [
+    {
+      id: "step-1",
+      timestamp: "2026-05-24T12:30:45-03:00",
+      node_name: "security_agent",
+      kind: "llm",
+      status: "success",
+      duration_ms: 200,
+      input_payload: { language: "typescript" },
+      output_payload: { findings: [] },
+      error_message: null,
+    },
+  ],
 };
 
 function createApp(historyService: HistoryService) {
