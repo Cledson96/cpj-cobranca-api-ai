@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { HealthController } from "@/modules/health/controllers/index.js";
+import { HealthController } from "@/modules/health/controllers";
 
 export class HealthRoutes {
   private readonly controller: HealthController;

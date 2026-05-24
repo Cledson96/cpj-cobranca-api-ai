@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FlowType {
+  review
+  compliance
+  document
+  tests
+}
+
+enum ExecutionFlowType {
+  review
+  compliance
+  document
+  tests
+  batch
+}
+
+enum ExecutionStatus {
+  pending
+  success
+  failed
+}
+
+enum ExecutionStepKind {
+  system
+  tool
+  prompt
+  llm
+  parser
+  persistence
+  webhook
+  cache
+}
+
+enum BatchStatus {
+  success
+  partial
+  failed
+}
+
+model Execution {
+  id                String              @id @default(uuid())
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  flowType          ExecutionFlowType
+  status            ExecutionStatus     @default(pending)
+  inputPayload      Json
+  outputPayload     Json?
+  durationMs        Int                 @default(0)
+  requestHash       String
+  cacheHit          Boolean             @default(false)
+  sourceExecutionId String?
+  errorMessage      String?
+  telemetry         ExecutionTelemetry?
+  steps             ExecutionStep[]
+  sourceExecution   Execution?          @relation("ExecutionCacheSource", fields: [sourceExecutionId], references: [id])
+  cacheChildren     Execution[]         @relation("ExecutionCacheSource")
+
+  @@index([createdAt])
+  @@index([flowType, status])
+  @@index([flowType, requestHash, status])
+}
+
+model ExecutionTelemetry {
+  id               String    @id @default(uuid())
+  executionId      String    @unique
+  provider         String
+  modelRequested   String
+  modelUsed        String?
+  langsmithRunId   String?
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  costUsd          Decimal?  @db.Decimal(12, 8)
+  createdAt        DateTime  @default(now())
+  execution        Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+}
+
+model ExecutionStep {
+  id            String            @id @default(uuid())
+  executionId   String
+  createdAt     DateTime          @default(now())
+  nodeName      String
+  kind          ExecutionStepKind
+  status        ExecutionStatus
+  inputPayload  Json?
+  outputPayload Json?
+  durationMs    Int               @default(0)
+  errorMessage  String?
+  execution     Execution         @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId, createdAt])
+}
+
+model PromptVersion {
+  id           String   @id @default(uuid())
+  flowType     FlowType
+  version      Int
+  name         String
+  systemPrompt String
+  userPrompt   String
+  isActive     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([flowType, version])
+  @@index([flowType, isActive])
+}
+
+model BatchExecution {
+  id           String      @id @default(uuid())
+  createdAt    DateTime    @default(now())
+  status       BatchStatus
+  itemCount    Int
+  successCount Int
+  failedCount  Int
+  durationMs   Int
+}

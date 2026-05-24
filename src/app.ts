@@ -1,11 +1,39 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
-import { HealthRoutes } from "@/modules/health/routes/index.js";
+import { prismaPlugin } from "@/infrastructure/database";
+import { HealthRoutes } from "@/modules/health/routes";
+import { type AppEnv, loadEnv } from "@shared";
+import {
+  ErrorHandlerMiddleware,
+  RequestContextMiddleware,
+  SecurityMiddleware,
+} from "@shared";
+
+export type AppOptions = {
+  env?: AppEnv;
+  registerDatabase?: boolean;
+  serverOptions?: FastifyServerOptions;
+};
 
 export class App {
   private readonly app: FastifyInstance;
+  private readonly env: AppEnv;
 
-  constructor(options: FastifyServerOptions = {}) {
-    this.app = Fastify(options);
+  constructor(options: AppOptions = {}) {
+    this.env = options.env ?? loadEnv();
+    this.app = Fastify({
+      bodyLimit: this.env.BODY_LIMIT_BYTES,
+      logger: {
+        level: this.env.LOG_LEVEL,
+      },
+      requestTimeout: this.env.REQUEST_TIMEOUT_MS,
+      ...options.serverOptions,
+    });
+    RequestContextMiddleware.register(this.app);
+    ErrorHandlerMiddleware.register(this.app);
+    SecurityMiddleware.register(this.app, this.env);
+    if (options.registerDatabase ?? true) {
+      this.registerPlugins();
+    }
     this.registerRoutes();
   }
 
@@ -13,8 +41,8 @@ export class App {
     return this.app;
   }
 
-  async start(port = 3000, host = "0.0.0.0"): Promise<void> {
-    await this.app.listen({ port, host });
+  async start(): Promise<void> {
+    await this.app.listen({ port: this.env.PORT, host: this.env.HOST });
   }
 
   async close(): Promise<void> {
@@ -24,8 +52,12 @@ export class App {
   private registerRoutes(): void {
     new HealthRoutes().register(this.app);
   }
+
+  private registerPlugins(): void {
+    this.app.register(prismaPlugin);
+  }
 }
 
-export function buildApp(options: FastifyServerOptions = {}): FastifyInstance {
+export function buildApp(options: AppOptions = {}): FastifyInstance {
   return new App(options).instance;
 }
