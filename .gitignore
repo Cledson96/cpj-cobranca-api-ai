@@ -19,3 +19,4 @@ temp/
 *.docx
 prisma/migrations/dev/
 Dockerfile.local
+docs/PLANO_INCREMENTAL.md

@@ -13,6 +13,10 @@ export function nowSaoPauloIso(): string {
   return dayjs().tz(SAO_PAULO_TIMEZONE).format();
 }
 
+export function toSaoPauloIso(value: ConfigType): string {
+  return dayjs(value).tz(SAO_PAULO_TIMEZONE).format();
+}
+
 export function formatDateTimeSaoPaulo(value: ConfigType, format = "DD/MM/YYYY HH:mm:ss"): string {
   return dayjs(value).tz(SAO_PAULO_TIMEZONE).format(format);
 }
