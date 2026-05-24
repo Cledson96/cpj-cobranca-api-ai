@@ -3,7 +3,7 @@ import { buildApp } from "@/app";
 import { createTestEnv } from "./support/test-env";
 
 describe("OpenAPI", () => {
-  it("documenta a rota de review no Swagger", async () => {
+  it("documenta as rotas publicas no Swagger", async () => {
     const app = buildApp({
       env: createTestEnv(),
       registerDatabase: false,
@@ -22,6 +22,18 @@ describe("OpenAPI", () => {
         "/api/v1/review": {
           post: {
             tags: ["Review"],
+            summary: expect.any(String),
+          },
+        },
+        "/api/v1/history": {
+          get: {
+            tags: ["History"],
+            summary: expect.any(String),
+          },
+        },
+        "/api/v1/history/{id}": {
+          get: {
+            tags: ["History"],
             summary: expect.any(String),
           },
         },

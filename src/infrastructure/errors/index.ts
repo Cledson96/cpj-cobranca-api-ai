@@ -31,6 +31,17 @@ export class BadRequestError extends AppError {
   }
 }
 
+export class NotFoundError extends AppError {
+  constructor(message = "Recurso nao encontrado", cause?: unknown) {
+    super({
+      code: "not_found",
+      message,
+      statusCode: 404,
+      cause,
+    });
+  }
+}
+
 export class GenericError extends AppError {
   constructor(message = "Erro interno desconhecido", cause?: unknown) {
     super({
