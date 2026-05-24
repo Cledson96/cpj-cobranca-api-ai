@@ -1,4 +1,5 @@
-import type { FastifyError, FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
+import { isAppError } from "@/infrastructure/errors";
 
 export class ErrorHandlerMiddleware {
   static register(app: FastifyInstance): void {
@@ -9,23 +10,61 @@ export class ErrorHandlerMiddleware {
       }
 
       reply.status(statusCode).send({
-        error: statusCode >= 500 ? "internal_server_error" : normalizeErrorCode(error),
-        message: statusCode >= 500 ? "Erro inesperado" : getErrorMessage(error),
+        error: getErrorCode(error, statusCode),
+        message: getErrorMessage(error, statusCode),
       });
     });
   }
 }
 
 function getStatusCode(error: unknown): number {
-  const statusCode = (error as Partial<FastifyError>).statusCode;
-  return statusCode && statusCode >= 400 && statusCode < 600 ? statusCode : 500;
+  if (isAppError(error)) {
+    return error.statusCode;
+  }
+
+  if (hasValidStatusCode(error)) {
+    return error.statusCode;
+  }
+
+  return 500;
 }
 
-function normalizeErrorCode(error: unknown): string {
-  const code = (error as Partial<FastifyError>).code;
-  return code ? code.toLowerCase() : "request_error";
+function getErrorCode(error: unknown, statusCode: number): string {
+  if (isAppError(error)) {
+    return error.code;
+  }
+
+  if (hasStringCode(error)) {
+    return error.code.toLowerCase();
+  }
+
+  return statusCode >= 500 ? "internal_server_error" : "request_error";
 }
 
-function getErrorMessage(error: unknown): string {
+function getErrorMessage(error: unknown, statusCode: number): string {
+  if (isAppError(error)) {
+    return error.message;
+  }
+
+  if (statusCode >= 500) {
+    return "Erro inesperado";
+  }
+
   return error instanceof Error ? error.message : "Requisicao invalida";
+}
+
+function hasValidStatusCode(error: unknown): error is { statusCode: number } {
+  if (!error || typeof error !== "object" || !("statusCode" in error)) {
+    return false;
+  }
+
+  return (
+    typeof error.statusCode === "number" &&
+    error.statusCode >= 400 &&
+    error.statusCode < 600
+  );
+}
+
+function hasStringCode(error: unknown): error is { code: string } {
+  return Boolean(error && typeof error === "object" && "code" in error && typeof error.code === "string");
 }

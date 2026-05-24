@@ -1,6 +1,8 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import { prismaPlugin } from "@/infrastructure/database";
+import { OpenApiPlugin } from "@/infrastructure/openapi";
 import { HealthRoutes } from "@/modules/health/routes";
+import { ReviewRoutes, type ReviewRoutesDependencies } from "@/modules/review";
 import { type AppEnv, loadEnv } from "@shared";
 import {
   ErrorHandlerMiddleware,
@@ -9,6 +11,7 @@ import {
 } from "@shared";
 
 export type AppOptions = {
+  dependencies?: ReviewRoutesDependencies;
   env?: AppEnv;
   registerDatabase?: boolean;
   serverOptions?: FastifyServerOptions;
@@ -31,10 +34,14 @@ export class App {
     RequestContextMiddleware.register(this.app);
     ErrorHandlerMiddleware.register(this.app);
     SecurityMiddleware.register(this.app, this.env);
+    OpenApiPlugin.registerCollector(this.app);
     if (options.registerDatabase ?? true) {
       this.registerPlugins();
     }
-    this.registerRoutes();
+    this.app.after(() => {
+      this.registerRoutes(options.dependencies ?? {});
+      OpenApiPlugin.registerUi(this.app);
+    });
   }
 
   get instance(): FastifyInstance {
@@ -49,8 +56,9 @@ export class App {
     await this.app.close();
   }
 
-  private registerRoutes(): void {
+  private registerRoutes(dependencies: ReviewRoutesDependencies): void {
     new HealthRoutes().register(this.app);
+    new ReviewRoutes(dependencies).register(this.app);
   }
 
   private registerPlugins(): void {

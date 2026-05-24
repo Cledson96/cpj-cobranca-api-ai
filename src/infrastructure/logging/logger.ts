@@ -19,13 +19,13 @@ const sensitiveKeys = new Set([
 
 export type LogContext = Record<string, unknown>;
 
-export function maskSensitiveData<T>(value: T, depth = 0): T {
+export function maskSensitiveData(value: unknown, depth = 0): unknown {
   if (depth > 10 || value === null || value === undefined) {
     return value;
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => maskSensitiveData(item, depth + 1)) as T;
+    return value.map((item) => maskSensitiveData(item, depth + 1));
   }
 
   if (typeof value === "object") {
@@ -35,28 +35,39 @@ export function maskSensitiveData<T>(value: T, depth = 0): T {
         ? "***MASKED***"
         : maskSensitiveData(item, depth + 1);
     }
-    return masked as T;
+    return masked;
   }
 
   return value;
+}
+
+export function maskLogContext(context: LogContext): LogContext {
+  const masked: LogContext = {};
+  for (const [key, value] of Object.entries(context)) {
+    masked[key] = sensitiveKeys.has(key.toLowerCase())
+      ? "***MASKED***"
+      : maskSensitiveData(value);
+  }
+
+  return masked;
 }
 
 export class StructuredLogger {
   constructor(private readonly logger: Pick<FastifyBaseLogger, "info" | "warn" | "error" | "debug">) {}
 
   info(message: string, context: LogContext = {}): void {
-    this.logger.info(maskSensitiveData(context), message);
+    this.logger.info(maskLogContext(context), message);
   }
 
   warn(message: string, context: LogContext = {}): void {
-    this.logger.warn(maskSensitiveData(context), message);
+    this.logger.warn(maskLogContext(context), message);
   }
 
   error(message: string, context: LogContext = {}): void {
-    this.logger.error(maskSensitiveData(context), message);
+    this.logger.error(maskLogContext(context), message);
   }
 
   debug(message: string, context: LogContext = {}): void {
-    this.logger.debug(maskSensitiveData(context), message);
+    this.logger.debug(maskLogContext(context), message);
   }
 }

@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { config as loadDotenv } from "dotenv";
+import { config } from "dotenv";
 import { z } from "zod";
 
 const booleanString = z
@@ -58,7 +58,7 @@ export function loadLocalEnvFiles(): void {
 
   for (const envPath of candidates) {
     if (existsSync(envPath)) {
-      loadDotenv({ path: envPath, override: false });
+      config({ path: envPath, override: false });
     }
   }
 }
