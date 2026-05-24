@@ -26,6 +26,9 @@ function createRepository() {
       findUnique: vi.fn(),
       findMany: vi.fn(),
     },
+    executionStep: {
+      create: vi.fn(),
+    },
   };
 
   return {
@@ -131,6 +134,36 @@ describe("ReviewExecutionRepository", () => {
         outputPayload: undefined,
         durationMs: 300,
         errorMessage: "OPENROUTER_API_KEY nao configurada",
+      },
+    });
+  });
+
+  it("registra passo da execucao de review", async () => {
+    const { prisma, repository } = createRepository();
+    prisma.executionStep.create.mockResolvedValue({
+      id: "step-1",
+    });
+
+    await repository.recordStep({
+      executionId: "execution-1",
+      nodeName: "security_agent",
+      kind: "llm",
+      status: "success",
+      inputPayload: { language: "typescript" },
+      outputPayload: { findings: [] },
+      durationMs: 200,
+    });
+
+    expect(prisma.executionStep.create).toHaveBeenCalledWith({
+      data: {
+        executionId: "execution-1",
+        nodeName: "security_agent",
+        kind: "llm",
+        status: "success",
+        inputPayload: { language: "typescript" },
+        outputPayload: { findings: [] },
+        durationMs: 200,
+        errorMessage: null,
       },
     });
   });

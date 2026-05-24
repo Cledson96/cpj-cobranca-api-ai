@@ -3,6 +3,7 @@ import type {
   CreatePendingReviewExecutionInput,
   MarkReviewExecutionFailedInput,
   MarkReviewExecutionSuccessInput,
+  RecordReviewExecutionStepInput,
   ReviewExecution,
   ReviewExecutionListItem,
   ReviewExecutionRecord,
@@ -43,6 +44,21 @@ export class ReviewExecutionRepository {
         outputPayload: undefined,
         durationMs: input.durationMs,
         errorMessage: input.errorMessage,
+      },
+    });
+  }
+
+  async recordStep(input: RecordReviewExecutionStepInput): Promise<void> {
+    await this.prisma.executionStep.create({
+      data: {
+        executionId: input.executionId,
+        nodeName: input.nodeName,
+        kind: input.kind,
+        status: input.status,
+        inputPayload: input.inputPayload,
+        outputPayload: input.outputPayload,
+        durationMs: input.durationMs,
+        errorMessage: input.errorMessage ?? null,
       },
     });
   }

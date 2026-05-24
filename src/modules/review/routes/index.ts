@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { ReviewExecutionRepository } from "@/modules/executions";
 import { ReviewController } from "@/modules/review/controllers";
 import { reviewRouteDocs } from "@/modules/review/docs";
 import { DefaultReviewService, type ReviewService } from "@/modules/review/services";
@@ -8,20 +9,36 @@ export type ReviewRoutesDependencies = {
 };
 
 export class ReviewRoutes {
-  private readonly controller: ReviewController;
+  private readonly dependencies: ReviewRoutesDependencies;
 
   constructor(dependencies: ReviewRoutesDependencies = {}) {
-    this.controller = new ReviewController(dependencies.reviewService ?? new DefaultReviewService());
+    this.dependencies = dependencies;
   }
 
   register(app: FastifyInstance): void {
+    const controller = new ReviewController(this.createReviewService(app));
+
     app.post(
       "/api/v1/review",
       {
         attachValidation: true,
         schema: reviewRouteDocs,
       },
-      this.controller.execute.bind(this.controller),
+      controller.execute.bind(controller),
     );
+  }
+
+  private createReviewService(app: FastifyInstance): ReviewService {
+    if (this.dependencies.reviewService) {
+      return this.dependencies.reviewService;
+    }
+
+    if ("prisma" in app) {
+      return new DefaultReviewService({
+        executionPersistence: new ReviewExecutionRepository(app.prisma),
+      });
+    }
+
+    return new DefaultReviewService();
   }
 }

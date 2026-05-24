@@ -1,10 +1,25 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import { BaseFlowGraph } from "@/modules/agent";
-import { GenericError } from "@/infrastructure/errors";
+import { GenericError, handleUnknownError } from "@/infrastructure/errors";
 import type { ReviewRequest, ReviewResponse } from "@shared";
+import dayjs from "dayjs";
+import type { RecordReviewExecutionStepInput } from "@/modules/executions";
 import { LanguageRouter, type ReviewLanguageRoute } from "../language";
 import type { ReviewGraphNode } from "../language";
 import type { ReviewLanguageGraph, ReviewLanguageGraphContext } from "./review-language.graph";
+
+export type ReviewStepRecorder = {
+  recordStep(input: RecordReviewExecutionStepInput): Promise<void>;
+};
+
+export type ReviewGraphRunContext = {
+  executionId?: string;
+  stepRecorder?: ReviewStepRecorder;
+};
+
+export interface ReviewGraphRunner {
+  invoke(input: ReviewRequest, context?: ReviewGraphRunContext): Promise<ReviewResponse>;
+}
 
 export type ReviewLanguageGraphs = {
   typescript: ReviewLanguageGraph;
@@ -20,13 +35,15 @@ export type ReviewFlowGraphDependencies = {
 
 const ReviewFlowAnnotation = Annotation.Root({
   input: Annotation<ReviewRequest>,
+  executionId: Annotation<string | undefined>,
+  stepRecorder: Annotation<ReviewStepRecorder | undefined>,
   route: Annotation<ReviewLanguageRoute | undefined>,
   output: Annotation<ReviewResponse | undefined>,
 });
 
 type ReviewFlowState = typeof ReviewFlowAnnotation.State;
 
-export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse> {
+export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse> implements ReviewGraphRunner {
   private readonly languageRouter: LanguageRouter;
   private readonly languageGraphs: ReviewLanguageGraphs;
 
@@ -36,9 +53,13 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
     this.languageGraphs = dependencies.languageGraphs;
   }
 
-  async invoke(input: ReviewRequest): Promise<ReviewResponse> {
+  async invoke(input: ReviewRequest, context: ReviewGraphRunContext = {}): Promise<ReviewResponse> {
     const graph = this.buildGraph();
-    const state = await graph.invoke({ input });
+    const state = await graph.invoke({
+      input,
+      executionId: context.executionId,
+      stepRecorder: context.stepRecorder,
+    });
 
     if (!state.output) {
       throw new GenericError("Fluxo de review nao gerou resposta final.");
@@ -68,10 +89,23 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
       .compile();
   }
 
-  private readonly routeLanguage = (state: ReviewFlowState) => {
-    return {
-      route: this.languageRouter.route(state.input),
-    };
+  private readonly routeLanguage = async (state: ReviewFlowState) => {
+    const route = this.languageRouter.route(state.input);
+
+    await this.recordStep(state, {
+      nodeName: "language_router",
+      kind: "system",
+      inputPayload: {
+        language: state.input.language,
+      },
+      outputPayload: {
+        language: route.language,
+        graphNode: route.graphNode,
+      },
+      startedAt: dayjs().valueOf(),
+    });
+
+    return { route };
   };
 
   private readonly selectGraphNode = (state: ReviewFlowState): ReviewGraphNode => {
@@ -105,11 +139,79 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
 
     const context: ReviewLanguageGraphContext = {
       languageProfile: state.route.profile,
+      executionId: state.executionId,
+      stepRecorder: state.stepRecorder,
     };
-    const output = await graph.invoke(state.input, context);
+    const startedAt = dayjs().valueOf();
 
-    return {
-      output,
-    };
+    try {
+      const output = await graph.invoke(state.input, context);
+
+      await this.recordStep(state, {
+        nodeName: state.route.graphNode,
+        kind: "system",
+        inputPayload: {
+          language: state.route.language,
+        },
+        outputPayload: output,
+        startedAt,
+      });
+
+      return {
+        output,
+      };
+    } catch (error) {
+      await this.recordStep(state, {
+        nodeName: state.route.graphNode,
+        kind: "system",
+        inputPayload: {
+          language: state.route.language,
+        },
+        startedAt,
+        error,
+      });
+      throw handleUnknownError(error);
+    }
   }
+
+  private async recordStep(
+    state: ReviewFlowState,
+    input: {
+      nodeName: string;
+      kind: RecordReviewExecutionStepInput["kind"];
+      inputPayload?: unknown;
+      outputPayload?: unknown;
+      startedAt: number;
+      error?: unknown;
+    },
+  ): Promise<void> {
+    if (!state.executionId || !state.stepRecorder) {
+      return;
+    }
+
+    const errorMessage = getErrorMessage(input.error);
+
+    await state.stepRecorder.recordStep({
+      executionId: state.executionId,
+      nodeName: input.nodeName,
+      kind: input.kind,
+      status: errorMessage ? "failed" : "success",
+      inputPayload: input.inputPayload,
+      outputPayload: input.outputPayload,
+      durationMs: dayjs().valueOf() - input.startedAt,
+      errorMessage,
+    });
+  }
+}
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) {
+    return null;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Erro desconhecido no passo do review.";
 }

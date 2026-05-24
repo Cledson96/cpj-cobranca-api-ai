@@ -1,7 +1,16 @@
 import type { ReviewRequest, ReviewResponse } from "@shared";
 
 export type ExecutionStatus = "pending" | "success" | "failed";
-export type ReviewFlowType = "review";
+export type ReviewFlowType = "review" | "compliance" | "document" | "tests" | "batch";
+export type ExecutionStepKind =
+  | "system"
+  | "tool"
+  | "prompt"
+  | "llm"
+  | "parser"
+  | "persistence"
+  | "webhook"
+  | "cache";
 
 export type ReviewExecutionRecord = {
   id: string;
@@ -24,8 +33,13 @@ export type PrismaExecutionDelegate = {
   findMany(input: unknown): Promise<ReviewExecutionRecord[]>;
 };
 
+export type PrismaExecutionStepDelegate = {
+  create(input: unknown): Promise<unknown>;
+};
+
 export type ReviewExecutionRepositoryPrisma = {
   execution: PrismaExecutionDelegate;
+  executionStep: PrismaExecutionStepDelegate;
 };
 
 export type CreatePendingReviewExecutionInput = {
@@ -43,6 +57,17 @@ export type MarkReviewExecutionFailedInput = {
   id: string;
   errorMessage: string;
   durationMs: number;
+};
+
+export type RecordReviewExecutionStepInput = {
+  executionId: string;
+  nodeName: string;
+  kind: ExecutionStepKind;
+  status: ExecutionStatus;
+  inputPayload?: unknown;
+  outputPayload?: unknown;
+  durationMs: number;
+  errorMessage?: string | null;
 };
 
 export type ReviewExecution = {

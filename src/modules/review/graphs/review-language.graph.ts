@@ -1,5 +1,7 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
-import { GenericError } from "@/infrastructure/errors";
+import dayjs from "dayjs";
+import { GenericError, handleUnknownError } from "@/infrastructure/errors";
+import type { RecordReviewExecutionStepInput } from "@/modules/executions";
 import type { ReviewRequest, ReviewResponse, SupportedLanguage } from "@shared";
 import {
   ComplexityAgent,
@@ -17,9 +19,12 @@ import type {
 } from "../models";
 import { DeterministicReviewToolsRunner } from "../tools";
 import type { LanguageProfile } from "../language";
+import type { ReviewStepRecorder } from "./review-flow.graph";
 
 export type ReviewLanguageGraphContext = {
   languageProfile: LanguageProfile;
+  executionId?: string;
+  stepRecorder?: ReviewStepRecorder;
 };
 
 export interface ReviewLanguageGraph {
@@ -40,6 +45,8 @@ export type ReviewLanguageGraphAgents = {
 const ReviewLanguageAnnotation = Annotation.Root({
   input: Annotation<ReviewRequest>,
   languageProfile: Annotation<LanguageProfile>,
+  executionId: Annotation<string | undefined>,
+  stepRecorder: Annotation<ReviewStepRecorder | undefined>,
   deterministicFindings: Annotation<ReviewFinding[]>({
     reducer: (_left: ReviewFinding[], right: ReviewFinding[]) => right,
     default: () => [],
@@ -68,6 +75,8 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
     const state = await graph.invoke({
       input,
       languageProfile: context.languageProfile,
+      executionId: context.executionId,
+      stepRecorder: context.stepRecorder,
     });
 
     if (!state.output) {
@@ -97,42 +106,69 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
       .compile();
   }
 
-  private readonly runDeterministicTools = (state: ReviewLanguageState) => {
+  private readonly runDeterministicTools = async (state: ReviewLanguageState) => {
+    const output = this.agents.toolsRunner.run(state.input);
+
+    await this.recordStep(state, {
+      nodeName: "deterministic_tools",
+      kind: "tool",
+      inputPayload: {
+        language: state.input.language,
+        code: state.input.code,
+      },
+      outputPayload: output,
+      startedAt: dayjs().valueOf(),
+    });
+
     return {
-      deterministicFindings: this.agents.toolsRunner.run(state.input),
+      deterministicFindings: output,
     };
   };
 
   private readonly runNamingClarityAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist(this.agents.namingClarityAgent, state);
+    return this.runSpecialist("naming_clarity_agent", this.agents.namingClarityAgent, state);
   };
 
   private readonly runErrorHandlingAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist(this.agents.errorHandlingAgent, state);
+    return this.runSpecialist("error_handling_agent", this.agents.errorHandlingAgent, state);
   };
 
   private readonly runResourceLeakAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist(this.agents.resourceLeakAgent, state);
+    return this.runSpecialist("resource_leak_agent", this.agents.resourceLeakAgent, state);
   };
 
   private readonly runComplexityAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist(this.agents.complexityAgent, state);
+    return this.runSpecialist("complexity_agent", this.agents.complexityAgent, state);
   };
 
   private readonly runSecurityAgent = async (state: ReviewLanguageState) => {
-    return this.runSpecialist(this.agents.securityAgent, state);
+    return this.runSpecialist("security_agent", this.agents.securityAgent, state);
   };
 
   private readonly runReviewAggregatorAgent = async (state: ReviewLanguageState) => {
-    const output = await this.agents.reviewAggregatorAgent.analyze(this.createContext(state));
+    const output = await this.runRecordedOperation(state, {
+      nodeName: "review_aggregator_agent",
+      kind: "llm",
+      inputPayload: this.createContextPayload(state),
+      operation: () => this.agents.reviewAggregatorAgent.analyze(this.createContext(state)),
+    });
 
     return {
       output,
     };
   };
 
-  private async runSpecialist(agent: ReviewSpecialistAgent, state: ReviewLanguageState) {
-    const output = await agent.analyze(this.createContext(state));
+  private async runSpecialist(
+    nodeName: string,
+    agent: ReviewSpecialistAgent,
+    state: ReviewLanguageState,
+  ) {
+    const output = await this.runRecordedOperation(state, {
+      nodeName,
+      kind: "llm",
+      inputPayload: this.createContextPayload(state),
+      operation: () => agent.analyze(this.createContext(state)),
+    });
 
     return {
       agentOutputs: [output],
@@ -147,6 +183,89 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
       agentOutputs: state.agentOutputs,
     };
   }
+
+  private createContextPayload(state: ReviewLanguageState): unknown {
+    return {
+      language: state.languageProfile.language,
+      deterministicFindings: state.deterministicFindings,
+      agentOutputs: state.agentOutputs,
+    };
+  }
+
+  private async runRecordedOperation<TOutput>(
+    state: ReviewLanguageState,
+    input: {
+      nodeName: string;
+      kind: RecordReviewExecutionStepInput["kind"];
+      inputPayload?: unknown;
+      operation: () => Promise<TOutput>;
+    },
+  ): Promise<TOutput> {
+    const startedAt = dayjs().valueOf();
+
+    try {
+      const output = await input.operation();
+      await this.recordStep(state, {
+        nodeName: input.nodeName,
+        kind: input.kind,
+        inputPayload: input.inputPayload,
+        outputPayload: output,
+        startedAt,
+      });
+
+      return output;
+    } catch (error) {
+      await this.recordStep(state, {
+        nodeName: input.nodeName,
+        kind: input.kind,
+        inputPayload: input.inputPayload,
+        startedAt,
+        error,
+      });
+      throw handleUnknownError(error);
+    }
+  }
+
+  private async recordStep(
+    state: ReviewLanguageState,
+    input: {
+      nodeName: string;
+      kind: RecordReviewExecutionStepInput["kind"];
+      inputPayload?: unknown;
+      outputPayload?: unknown;
+      startedAt: number;
+      error?: unknown;
+    },
+  ): Promise<void> {
+    if (!state.executionId || !state.stepRecorder) {
+      return;
+    }
+
+    const errorMessage = getErrorMessage(input.error);
+
+    await state.stepRecorder.recordStep({
+      executionId: state.executionId,
+      nodeName: input.nodeName,
+      kind: input.kind,
+      status: errorMessage ? "failed" : "success",
+      inputPayload: input.inputPayload,
+      outputPayload: input.outputPayload,
+      durationMs: dayjs().valueOf() - input.startedAt,
+      errorMessage,
+    });
+  }
+}
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) {
+    return null;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Erro desconhecido no passo do review.";
 }
 
 export function createReviewLanguageGraphAgents(
