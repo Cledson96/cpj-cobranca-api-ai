@@ -31,6 +31,12 @@ describe("OpenAPI", () => {
             summary: expect.any(String),
           },
         },
+        "/api/v1/document": {
+          post: {
+            tags: ["Document"],
+            summary: expect.any(String),
+          },
+        },
         "/api/v1/history": {
           get: {
             tags: ["History"],
