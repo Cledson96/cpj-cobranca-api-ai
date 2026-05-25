@@ -7,7 +7,7 @@ export const historyTelemetrySchema = z.object({
   provider: nonEmptyString,
   model_requested: nonEmptyString,
   model_used: z.string().nullable(),
-  langsmith_run_id: z.string().nullable(),
+  openrouter_generation_id: z.string().nullable(),
   prompt_tokens: nullableNumber,
   completion_tokens: nullableNumber,
   total_tokens: nullableNumber,

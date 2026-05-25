@@ -160,7 +160,7 @@ describe("ReviewEngine com persistencia", () => {
         provider: "openrouter",
         modelRequested: "openai/gpt-4o-mini",
         modelUsed: "openai/gpt-4o-mini",
-        langsmithRunId: "gen-1",
+        openrouterGenerationId: "gen-1",
         promptTokens: 100,
         completionTokens: 20,
         totalTokens: 120,

@@ -74,7 +74,7 @@ model ExecutionTelemetry {
   provider         String
   modelRequested   String
   modelUsed        String?
-  langsmithRunId   String?
+  openrouterGenerationId   String?
   promptTokens     Int?
   completionTokens Int?
   totalTokens      Int?

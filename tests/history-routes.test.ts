@@ -15,7 +15,7 @@ const historyItem = {
     provider: "openrouter",
     model_requested: "openai/gpt-4o-mini",
     model_used: "openai/gpt-4o-mini",
-    langsmith_run_id: "gen-1",
+    openrouter_generation_id: "gen-1",
     prompt_tokens: 100,
     completion_tokens: 20,
     total_tokens: 120,

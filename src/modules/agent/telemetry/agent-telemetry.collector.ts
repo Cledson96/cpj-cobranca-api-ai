@@ -42,27 +42,32 @@ export class AgentTelemetryCollector implements AgentExecutionTelemetrySink, Age
   }
 
   snapshot(): AgentExecutionTelemetry | null {
-    if (this.records.length === 0) {
+    const records = this.records.splice(0);
+
+    if (records.length === 0) {
       return null;
     }
 
     return {
-      provider: this.firstValue((record) => record.provider) ?? "openrouter",
-      modelRequested: this.firstValue((record) => record.modelRequested) ?? "",
-      modelUsed: this.joinUniqueValues((record) => record.modelUsed),
-      generationIds: this.uniqueValues((record) => record.generationId),
-      promptTokens: this.sumNullable((record) => record.promptTokens),
-      completionTokens: this.sumNullable((record) => record.completionTokens),
-      totalTokens: this.sumNullable((record) => record.totalTokens),
-      costUsd: this.sumMoney((record) => record.costUsd),
-      inputCostUsd: this.sumMoney((record) => record.inputCostUsd),
-      outputCostUsd: this.sumMoney((record) => record.outputCostUsd),
-      cacheReadTokens: this.sumNullable((record) => record.cacheReadTokens),
+      provider: this.firstValue((record) => record.provider, records) ?? "openrouter",
+      modelRequested: this.firstValue((record) => record.modelRequested, records) ?? "",
+      modelUsed: this.joinUniqueValues((record) => record.modelUsed, records),
+      generationIds: this.uniqueValues((record) => record.generationId, records),
+      promptTokens: this.sumNullable((record) => record.promptTokens, records),
+      completionTokens: this.sumNullable((record) => record.completionTokens, records),
+      totalTokens: this.sumNullable((record) => record.totalTokens, records),
+      costUsd: this.sumMoney((record) => record.costUsd, records),
+      inputCostUsd: this.sumMoney((record) => record.inputCostUsd, records),
+      outputCostUsd: this.sumMoney((record) => record.outputCostUsd, records),
+      cacheReadTokens: this.sumNullable((record) => record.cacheReadTokens, records),
     };
   }
 
-  private firstValue(read: (record: LlmRunTelemetry) => string | null | undefined): string | null {
-    for (const record of this.records) {
+  private firstValue(
+    read: (record: LlmRunTelemetry) => string | null | undefined,
+    records: LlmRunTelemetry[],
+  ): string | null {
+    for (const record of records) {
       const value = read(record);
       if (value) {
         return value;
@@ -72,9 +77,12 @@ export class AgentTelemetryCollector implements AgentExecutionTelemetrySink, Age
     return null;
   }
 
-  private uniqueValues(read: (record: LlmRunTelemetry) => string | null | undefined): string[] {
+  private uniqueValues(
+    read: (record: LlmRunTelemetry) => string | null | undefined,
+    records: LlmRunTelemetry[],
+  ): string[] {
     const values = new Set<string>();
-    for (const record of this.records) {
+    for (const record of records) {
       const value = read(record);
       if (value) {
         values.add(value);
@@ -84,17 +92,23 @@ export class AgentTelemetryCollector implements AgentExecutionTelemetrySink, Age
     return [...values];
   }
 
-  private joinUniqueValues(read: (record: LlmRunTelemetry) => string | null | undefined): string | null {
-    const values = this.uniqueValues(read);
+  private joinUniqueValues(
+    read: (record: LlmRunTelemetry) => string | null | undefined,
+    records: LlmRunTelemetry[],
+  ): string | null {
+    const values = this.uniqueValues(read, records);
 
     return values.length > 0 ? values.join(",") : null;
   }
 
-  private sumNullable(read: (record: LlmRunTelemetry) => number | null | undefined): number | null {
+  private sumNullable(
+    read: (record: LlmRunTelemetry) => number | null | undefined,
+    records: LlmRunTelemetry[],
+  ): number | null {
     let total = 0;
     let hasValue = false;
 
-    for (const record of this.records) {
+    for (const record of records) {
       const value = read(record);
       if (typeof value === "number") {
         total += value;
@@ -105,8 +119,11 @@ export class AgentTelemetryCollector implements AgentExecutionTelemetrySink, Age
     return hasValue ? total : null;
   }
 
-  private sumMoney(read: (record: LlmRunTelemetry) => number | null | undefined): number | null {
-    const total = this.sumNullable(read);
+  private sumMoney(
+    read: (record: LlmRunTelemetry) => number | null | undefined,
+    records: LlmRunTelemetry[],
+  ): number | null {
+    const total = this.sumNullable(read, records);
 
     return total === null ? null : roundUsd(total);
   }

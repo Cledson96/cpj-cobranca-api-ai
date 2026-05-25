@@ -122,7 +122,7 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
       provider: telemetry.provider,
       modelRequested: telemetry.modelRequested,
       modelUsed: telemetry.modelUsed,
-      langsmithRunId: telemetry.generationIds[0] ?? null,
+      openrouterGenerationId: telemetry.generationIds[0] ?? null,
       promptTokens: telemetry.promptTokens,
       completionTokens: telemetry.completionTokens,
       totalTokens: telemetry.totalTokens,

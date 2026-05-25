@@ -16,7 +16,7 @@ export type ReviewExecutionTelemetryRecord = {
   provider: string;
   modelRequested: string;
   modelUsed?: string | null;
-  langsmithRunId?: string | null;
+  openrouterGenerationId?: string | null;
   promptTokens?: number | null;
   completionTokens?: number | null;
   totalTokens?: number | null;
@@ -109,7 +109,7 @@ export type RecordReviewExecutionTelemetryInput = {
   provider: string;
   modelRequested: string;
   modelUsed?: string | null;
-  langsmithRunId?: string | null;
+  openrouterGenerationId?: string | null;
   promptTokens?: number | null;
   completionTokens?: number | null;
   totalTokens?: number | null;
@@ -123,7 +123,7 @@ export type ReviewExecutionTelemetry = {
   provider: string;
   model_requested: string;
   model_used: string | null;
-  langsmith_run_id: string | null;
+  openrouter_generation_id: string | null;
   prompt_tokens: number | null;
   completion_tokens: number | null;
   total_tokens: number | null;

@@ -45,16 +45,20 @@ type ReviewFlowState = typeof ReviewFlowAnnotation.State;
 export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse> implements ReviewGraphRunner {
   private readonly languageRouter: LanguageRouter;
   private readonly languageGraphs: ReviewLanguageGraphs;
+  private readonly compiledGraph: ReturnType<ReviewFlowGraph["buildGraph"]>;
+  private currentStepRecorder?: ReviewStepRecorder;
 
   constructor(dependencies: ReviewFlowGraphDependencies) {
     super();
     this.languageRouter = dependencies.languageRouter;
     this.languageGraphs = dependencies.languageGraphs;
+    this.compiledGraph = this.buildGraph();
   }
 
   async invoke(input: ReviewRequest, context: ReviewGraphRunContext = {}): Promise<ReviewResponse> {
-    const graph = this.buildGraph(context.stepRecorder);
-    const state = await graph.invoke({
+    this.currentStepRecorder = context.stepRecorder;
+
+    const state = await this.compiledGraph.invoke({
       input,
       executionId: context.executionId,
     });
@@ -66,13 +70,13 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
     return state.output;
   }
 
-  private buildGraph(stepRecorder?: ReviewStepRecorder) {
+  private buildGraph() {
     return new StateGraph(ReviewFlowAnnotation)
-      .addNode("language_router", (state) => this.routeLanguage(state, stepRecorder))
-      .addNode("review_typescript", (state) => this.runTypeScriptGraph(state, stepRecorder))
-      .addNode("review_javascript", (state) => this.runJavaScriptGraph(state, stepRecorder))
-      .addNode("review_python", (state) => this.runPythonGraph(state, stepRecorder))
-      .addNode("review_php", (state) => this.runPhpGraph(state, stepRecorder))
+      .addNode("language_router", (state) => this.routeLanguage(state))
+      .addNode("review_typescript", (state) => this.runTypeScriptGraph(state))
+      .addNode("review_javascript", (state) => this.runJavaScriptGraph(state))
+      .addNode("review_python", (state) => this.runPythonGraph(state))
+      .addNode("review_php", (state) => this.runPhpGraph(state))
       .addEdge(START, "language_router")
       .addConditionalEdges("language_router", this.selectGraphNode, {
         review_typescript: "review_typescript",
@@ -89,11 +93,10 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
 
   private readonly routeLanguage = async (
     state: ReviewFlowState,
-    stepRecorder?: ReviewStepRecorder,
   ) => {
     const route = this.languageRouter.route(state.input);
 
-    await this.recordStep(state, stepRecorder, {
+    await this.recordStep(state, {
       nodeName: "language_router",
       kind: "system",
       inputPayload: {
@@ -119,36 +122,31 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
 
   private readonly runTypeScriptGraph = async (
     state: ReviewFlowState,
-    stepRecorder?: ReviewStepRecorder,
   ) => {
-    return this.runLanguageGraph(this.languageGraphs.typescript, state, stepRecorder);
+    return this.runLanguageGraph(this.languageGraphs.typescript, state);
   };
 
   private readonly runJavaScriptGraph = async (
     state: ReviewFlowState,
-    stepRecorder?: ReviewStepRecorder,
   ) => {
-    return this.runLanguageGraph(this.languageGraphs.javascript, state, stepRecorder);
+    return this.runLanguageGraph(this.languageGraphs.javascript, state);
   };
 
   private readonly runPythonGraph = async (
     state: ReviewFlowState,
-    stepRecorder?: ReviewStepRecorder,
   ) => {
-    return this.runLanguageGraph(this.languageGraphs.python, state, stepRecorder);
+    return this.runLanguageGraph(this.languageGraphs.python, state);
   };
 
   private readonly runPhpGraph = async (
     state: ReviewFlowState,
-    stepRecorder?: ReviewStepRecorder,
   ) => {
-    return this.runLanguageGraph(this.languageGraphs.php, state, stepRecorder);
+    return this.runLanguageGraph(this.languageGraphs.php, state);
   };
 
   private async runLanguageGraph(
     graph: ReviewLanguageGraph,
     state: ReviewFlowState,
-    stepRecorder?: ReviewStepRecorder,
   ) {
     if (!state.route) {
       throw new GenericError("Rota de linguagem ausente para executar review.");
@@ -157,14 +155,14 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
     const context: ReviewLanguageGraphContext = {
       languageProfile: state.route.profile,
       executionId: state.executionId,
-      stepRecorder,
+      stepRecorder: this.currentStepRecorder,
     };
     const startedAt = dayjs().valueOf();
 
     try {
       const output = await graph.invoke(state.input, context);
 
-      await this.recordStep(state, stepRecorder, {
+      await this.recordStep(state, {
         nodeName: state.route.graphNode,
         kind: "system",
         inputPayload: {
@@ -178,7 +176,7 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
         output,
       };
     } catch (error) {
-      await this.recordStep(state, stepRecorder, {
+      await this.recordStep(state, {
         nodeName: state.route.graphNode,
         kind: "system",
         inputPayload: {
@@ -193,7 +191,6 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
 
   private async recordStep(
     state: ReviewFlowState,
-    stepRecorder: ReviewStepRecorder | undefined,
     input: {
       nodeName: string;
       kind: RecordReviewExecutionStepInput["kind"];
@@ -203,13 +200,13 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
       error?: unknown;
     },
   ): Promise<void> {
-    if (!state.executionId || !stepRecorder) {
+    if (!state.executionId || !this.currentStepRecorder) {
       return;
     }
 
     const errorMessage = getErrorMessage(input.error);
 
-    await stepRecorder.recordStep({
+    await this.currentStepRecorder.recordStep({
       executionId: state.executionId,
       nodeName: input.nodeName,
       kind: input.kind,
