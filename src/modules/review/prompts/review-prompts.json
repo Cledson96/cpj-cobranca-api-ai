@@ -193,11 +193,14 @@
         "Responda somente no schema estruturado solicitado: agent_name, findings, positives e summary.",
         "Analise entrada externa, request, headers, cookies, query/body/path params, arquivos, env, banco de dados, comandos, paths, templates, logs, serializacao, autorizacao, autenticacao, criptografia, secrets, SSRF, XSS, SQL/NoSQL injection, command injection e path traversal.",
         "Trace a origem do dado antes de reportar: entrada externa sem validacao pesa mais que constante interna ou valor gerado pelo servidor.",
+        "Quando houver tipo explicito, respeite o contrato estatico da linguagem: em TypeScript, nao afirme que parametro `id: string` pode ser null ou undefined, a menos que o codigo mostre boundary externo sem validacao runtime, cast inseguro ou bypass do tipo.",
         "Nao reporte SQL injection quando houver ORM/query builder com binding claro, prepared statement ou parametros separados. Reporte se houver concatenacao/interpolacao de entrada externa na query.",
         "Nao reporte XSS apenas por renderizar dado se o framework faz escaping por padrao; reporte uso de innerHTML/dangerouslySetInnerHTML/template bruto sem sanitizacao apropriada.",
         "Nao reporte segredo hardcoded para valores claramente fake, exemplo de teste ou placeholder, a menos que pareca credencial real ou esteja em codigo de producao.",
-        "Reporte validacao insuficiente quando o dado externo controla query, comando, path, URL, permissao, valor financeiro, filtro multi-tenant ou operacao destrutiva.",
+        "Reporte validacao insuficiente como medium apenas quando o dado vem de boundary externo ou controla query, comando, path, URL, permissao, valor financeiro, filtro multi-tenant ou operacao destrutiva. Se a origem nao estiver clara, trate como risco condicionado, low ou descarte.",
+        "Para TypeScript, ao discutir validacao de strings, prefira avaliar formato, allowlist, normalizacao e origem externa do dado; nao baseie o achado em null/undefined quando o tipo declarado exclui esses valores.",
         "Verifique se logs, erros e respostas expõem token, senha, segredo, CPF, cookie, Authorization, payload sensivel, stack trace indevida ou dados de outro tenant.",
+        "Nao extrapole que um identificador e CPF, email ou token sem evidencia. Se o label, variavel ou contexto indicar token, senha, Authorization ou dado pessoal, aumente a severidade; caso contrario descreva como exposicao de identificador potencialmente sensivel.",
         "Use severity high para vulnerabilidade exploravel com impacto em dados, execucao de comando, autenticacao/autorizacao, tenant isolation, segredo real, SQL injection, SSRF relevante ou path traversal de arquivo sensivel.",
         "Use severity medium para validacao incompleta, logging sensivel limitado, configuracao insegura contextual ou risco dependente de pre-condicao plausivel.",
         "Use severity low para hardening ou defesa em profundidade sem explorabilidade clara, e evite muitos lows.",
@@ -229,6 +232,11 @@
           "expected": "Reporte exposicao de dados sensiveis em log. Sugira mascarar/remover Authorization, cookies, senhas, tokens e campos sensiveis do body antes de logar. Severity high ou medium conforme ambiente e escopo."
         },
         {
+          "title": "Validacao respeitando tipo TypeScript",
+          "input": "export async function buscarUsuario(id: string, db) { const sql = `select * from users where id = ${id}`; return db.query(sql); }",
+          "expected": "Reporte SQL injection por interpolacao. Se mencionar validacao, nao diga que id pode ser null ou undefined pelo contrato `string`; prefira dizer que, se vier de request, deve validar formato/allowlist antes da query. Descarte a validacao como issue separada se a origem externa nao estiver demonstrada."
+        },
+        {
           "title": "XSS condicionado",
           "input": "element.innerHTML = comment;",
           "expected": "Reporte XSS se comment vier de usuario ou fonte externa. Sugira textContent quando quiser texto, ou sanitizacao robusta/allowlist quando HTML for requisito. Se a origem nao estiver clara, marque como risco condicionado e nao afirme exploracao garantida."
@@ -245,6 +253,8 @@
       "Nao transforme return db.query(sql) em issue de tratamento de erro; isso e propagacao correta quando caller ou middleware trata a falha.",
       "Nao chame de pura uma funcao que faz log, banco, rede, filesystem ou outro efeito colateral; descreva testabilidade sem afirmar pureza.",
       "Se sugerir prepared statement e o contrato atual nao aceitar parametros, mencione ajuste no contrato ou adaptador antes do exemplo.",
+      "Ao consolidar achados de validacao em TypeScript, respeite tipos explicitos: nao aceite descricao dizendo que `id: string` pode ser null ou undefined sem evidencia de boundary externo, cast inseguro ou bypass de tipo. Prefira formato/allowlist/origem externa.",
+      "Mantenha ausencia de validacao como issue medium somente quando houver origem externa ou controle de operacao sensivel demonstrado. Se for apenas possibilidade sem evidencia, rebaixe para low, mova para summary ou descarte.",
       "Nao rebaixe codigo por usar nome em portugues, por nao incluir async no nome, ou por usar id em escopo pequeno; reporte nomenclatura somente quando causar ambiguidade real.",
       "Descarte achados fracos, subjetivos, sem evidencia, contraditos pelo codigo, baseados em gosto pessoal ou que ignorem padrao idiomatico da linguagem/framework.",
       "Preserve achados deterministicos como evidencia de apoio quando fizerem sentido, mas nao repita um item deterministico se um especialista ja explicou melhor a mesma causa raiz.",
@@ -257,6 +267,7 @@
       "Defina overall_quality como good quando nao houver issues relevantes ou houver apenas observacoes pequenas sem risco funcional.",
       "Use score de 0 a 10 de forma consistente: 9-10 codigo muito bom sem issues relevantes; 7-8 bom com melhorias pequenas; 5-6 precisa melhorar por riscos medium; 3-4 risco serio, high isolado ou varias falhas; 0-2 vulnerabilidade/falha critica evidente ou codigo inseguro para producao.",
       "Inclua positives reais e especificos extraidos dos especialistas ou do codigo: validacao, nomes claros, fluxo linear, cleanup, binding seguro, propagacao correta de erro, separacao de responsabilidades.",
+      "Nao inclua positives genericos ou pouco relevantes ao contexto, como tree-shaking em backend/API, exportacao nomeada sem impacto claro, elogios triviais ou afirmacoes que nao ajudam quem vai corrigir o codigo.",
       "Se nao houver positivos evidentes, use array vazio em vez de elogio generico.",
       "O summary deve ser curto, direto e orientar prioridade de correcao: o que corrigir primeiro e por que.",
       "Mantenha a resposta final no idioma portugues do Brasil, com termos tecnicos claros."
