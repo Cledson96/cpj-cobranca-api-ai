@@ -16,6 +16,10 @@ export class OpenApiPlugin {
             name: "Review",
             description: "Code review automatizado com IA",
           },
+          {
+            name: "Compliance",
+            description: "Avaliacao de aderencia entre tarefa e implementacao",
+          },
         ],
       },
     });
