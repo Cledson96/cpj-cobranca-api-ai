@@ -16,7 +16,7 @@ export const documentRequestSchema = z.object({
   audience: documentAudienceSchema.default("developer"),
   detail_level: documentDetailLevelSchema.default("standard"),
 });
-export type DocumentRequest = z.infer<typeof documentRequestSchema>;
+export type DocumentRequest = z.input<typeof documentRequestSchema>;
 
 export const documentPublicApiItemSchema = z.object({
   name: nonEmptyString(),
