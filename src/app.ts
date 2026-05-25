@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastif
 import { prismaPlugin } from "@/infrastructure/database";
 import { createFastifyLoggerOptions } from "@/infrastructure/logging";
 import { OpenApiPlugin } from "@/infrastructure/openapi";
+import { BatchRoutes, type BatchRoutesDependencies } from "@/modules/batch";
 import { ComplianceRoutes, type ComplianceRoutesDependencies } from "@/modules/compliance";
 import { DocumentRoutes, type DocumentRoutesDependencies } from "@/modules/document";
 import { HealthRoutes } from "@/modules/health/routes";
@@ -15,7 +16,8 @@ import {
   SecurityMiddleware,
 } from "@shared";
 
-export type AppDependencies = ComplianceRoutesDependencies &
+export type AppDependencies = BatchRoutesDependencies &
+  ComplianceRoutesDependencies &
   DocumentRoutesDependencies &
   ReviewRoutesDependencies &
   TestsRoutesDependencies &
@@ -71,6 +73,7 @@ export class App {
     new ComplianceRoutes(dependencies).register(this.app);
     new DocumentRoutes(dependencies).register(this.app);
     new TestsRoutes(dependencies).register(this.app);
+    new BatchRoutes(dependencies).register(this.app);
     new HistoryRoutes(dependencies).register(this.app);
   }
 
