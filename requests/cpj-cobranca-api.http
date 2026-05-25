@@ -1,7 +1,7 @@
 ### ========================================
-### CPJ-Cobranca API — Manual Test Requests
+### CPJ-Cobranca API - Manual Test Requests
 ### ========================================
-### Base URL (local dev)
+### Base URL (local dev ou Docker)
 @baseUrl = http://localhost:3000
 
 ### -----------------------
@@ -10,7 +10,7 @@
 GET {{baseUrl}}/health
 
 ### -----------------------
-### POST Review — TypeScript
+### POST Review - TypeScript
 ### -----------------------
 POST {{baseUrl}}/api/v1/review
 Content-Type: application/json
@@ -18,23 +18,23 @@ Content-Type: application/json
 {
   "code": "function calculateTotal(items: { price: number; quantity: number }[]): number {\n  return items.reduce((sum, item) => {\n    return sum + item.price * item.quantity;\n  }, 0);\n}",
   "language": "typescript",
-  "context": "Função de cálculo de total em carrinho de compras"
+  "context": "Funcao de calculo de total em carrinho de compras"
 }
 
 ### -----------------------
-### POST Review — JavaScript
+### POST Review Stream - SSE
 ### -----------------------
-POST {{baseUrl}}/api/v1/review
+POST {{baseUrl}}/api/v1/review/stream
 Content-Type: application/json
 
 {
   "code": "const data = await fetch('https://api.example.com/users');\nconst users = await data.json();\nconsole.log(users);",
   "language": "javascript",
-  "context": "Busca de usuários em API externa"
+  "context": "Busca de usuarios em API externa"
 }
 
 ### -----------------------
-### POST Review — Python
+### POST Review - Python
 ### -----------------------
 POST {{baseUrl}}/api/v1/review
 Content-Type: application/json
@@ -42,11 +42,11 @@ Content-Type: application/json
 {
   "code": "def get_user(user_id):\n    conn = sqlite3.connect('database.db')\n    cursor = conn.cursor()\n    cursor.execute(f\"SELECT * FROM users WHERE id = {user_id}\")\n    return cursor.fetchone()",
   "language": "python",
-  "context": "Função de consulta a banco SQLite"
+  "context": "Funcao de consulta a banco SQLite"
 }
 
 ### -----------------------
-### POST Review — PHP
+### POST Review - PHP
 ### -----------------------
 POST {{baseUrl}}/api/v1/review
 Content-Type: application/json
@@ -58,11 +58,84 @@ Content-Type: application/json
 }
 
 ### -----------------------
-### GET History — List Latest
+### POST Compliance
+### -----------------------
+POST {{baseUrl}}/api/v1/compliance
+Content-Type: application/json
+
+{
+  "task_description": "Permitir renegociacao apenas para contratos ativos e registrar auditoria.",
+  "code": "if (contract.active) { renegotiate(contract); audit(contract.id); }",
+  "language": "typescript"
+}
+
+### -----------------------
+### POST Document
+### -----------------------
+POST {{baseUrl}}/api/v1/document
+Content-Type: application/json
+
+{
+  "code": "export async function chargeCustomer(customerId: string, amount: number) { if (amount <= 0) throw new Error('invalid amount'); await repository.save({ customerId, amount }); return { approved: true }; }",
+  "language": "typescript",
+  "title": "Servico de cobranca",
+  "audience": "developer",
+  "detail_level": "standard"
+}
+
+### -----------------------
+### POST Tests
+### -----------------------
+POST {{baseUrl}}/api/v1/tests
+Content-Type: application/json
+
+{
+  "code": "export function charge(amount: number) { if (amount <= 0) throw new Error('invalid amount'); return amount > 0; }",
+  "language": "typescript",
+  "framework": "vitest",
+  "test_goal": "Cobrir valor positivo e erro de valor invalido.",
+  "include_mocks": false
+}
+
+### -----------------------
+### POST Batch
+### -----------------------
+POST {{baseUrl}}/api/v1/batch
+Content-Type: application/json
+
+{
+  "continue_on_error": true,
+  "notify": false,
+  "items": [
+    {
+      "flow_type": "document",
+      "payload": {
+        "code": "export async function chargeCustomer(customerId: string, amount: number) { if (amount <= 0) throw new Error('invalid amount'); await repository.save({ customerId, amount }); return { approved: true }; }",
+        "language": "typescript",
+        "title": "Servico de cobranca",
+        "audience": "developer",
+        "detail_level": "standard"
+      }
+    },
+    {
+      "flow_type": "tests",
+      "payload": {
+        "code": "export function charge(amount: number) { if (amount <= 0) throw new Error('invalid amount'); return amount > 0; }",
+        "language": "typescript",
+        "framework": "vitest",
+        "test_goal": "Cobrir valor positivo e erro de valor invalido.",
+        "include_mocks": false
+      }
+    }
+  ]
+}
+
+### -----------------------
+### GET History - List Latest
 ### -----------------------
 GET {{baseUrl}}/api/v1/history
 
 ### -----------------------
-### GET History — By ID (replace with actual UUID)
+### GET History - By ID (replace with actual UUID)
 ### -----------------------
 GET {{baseUrl}}/api/v1/history/00000000-0000-0000-0000-000000000000

@@ -1,6 +1,6 @@
 # CPJ-Cobranca API AI
 
-API do case técnico CPJ-Cobrança para revisão automatizada de código usando agentes de IA (LangGraph + OpenRouter).
+API do case técnico CPJ-Cobrança para revisão de código, validação de aderência, documentação, geração de testes e execução em lote usando agentes de IA (LangGraph + OpenRouter).
 
 ## Funcionalidades
 
@@ -8,6 +8,7 @@ API do case técnico CPJ-Cobrança para revisão automatizada de código usando 
 - **Avaliação de aderência** entre tarefa e código implementado via fluxo `compliance`
 - **Documentação técnica** gerada a partir de código via fluxo `document`
 - **Geração de testes** via fluxo `tests`, com estratégia, casos estruturados e código de teste
+- **Execução em lote** via fluxo `batch`, orquestrando `review`, `compliance`, `document` e `tests`
 - **Grafos LangGraph** — orquestração de agentes especialistas (segurança, complexidade, resource leak, error handling, naming/clarity) com agregador final
 - **Ferramentas determinísticas** — análise estática complementar (regex patterns, lint-like checks)
 - **Histórico de execuções** — persistência em PostgreSQL via Prisma com steps e telemetria
@@ -19,7 +20,7 @@ API do case técnico CPJ-Cobrança para revisão automatizada de código usando 
 
 ## Estado Atual
 
-Os fluxos `review`, `compliance`, `document` e `tests` estao implementados com endpoint HTTP, cache por hash, webhook opcional, historico persistido, telemetria do OpenRouter e Docker Compose. O fluxo `review` tambem possui streaming SSE. O fluxo `batch` ainda esta fora do escopo entregue nesta fase.
+Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementados com endpoint HTTP, Docker Compose e documentacao OpenAPI. Os fluxos individuais possuem cache por hash, webhook opcional, historico persistido e telemetria do OpenRouter. O fluxo `review` tambem possui streaming SSE, e o `batch` executa os fluxos prontos em sequencia com resumo persistido.
 
 ## Stack
 
@@ -56,6 +57,7 @@ npm run dev
 ```
 
 Acesse em `http://localhost:3000/health` e `http://localhost:3000/docs`.
+Exemplos manuais completos estao em `requests/cpj-cobranca-api.http`.
 
 ## Docker (produção)
 
@@ -81,6 +83,7 @@ docker compose logs -f api
 | POST   | `/api/v1/compliance` | Avalia aderência entre tarefa e código |
 | POST   | `/api/v1/document` | Gera documentação técnica a partir de código |
 | POST   | `/api/v1/tests`    | Gera estratégia e código de testes     |
+| POST   | `/api/v1/batch`    | Executa varios fluxos em sequencia     |
 | GET    | `/api/v1/history`   | Lista últimas execuções            |
 | GET    | `/api/v1/history/:id` | Detalhes de uma execução         |
 | GET    | `/docs`             | Swagger UI (OpenAPI)               |
@@ -186,6 +189,61 @@ Resposta:
 }
 ```
 
+### POST /api/v1/batch
+
+Executa itens de `review`, `compliance`, `document` e `tests` em sequencia. Use `continue_on_error=false` para interromper no primeiro item com falha. O retorno do batch traz `execution_id` e `cache_hit` nulos por item no v1; a rastreabilidade detalhada dos subfluxos fica em `/api/v1/history`.
+
+```json
+{
+  "continue_on_error": true,
+  "notify": false,
+  "items": [
+    {
+      "flow_type": "review",
+      "payload": {
+        "code": "function sum(a, b) { return a + b; }",
+        "language": "javascript"
+      }
+    },
+    {
+      "flow_type": "tests",
+      "payload": {
+        "code": "export function charge(amount: number) { return amount > 0; }",
+        "language": "typescript",
+        "framework": "vitest",
+        "include_mocks": false
+      }
+    }
+  ]
+}
+```
+
+Resposta:
+
+```json
+{
+  "batch_id": "uuid-do-batch",
+  "status": "success",
+  "results": [
+    {
+      "index": 0,
+      "flow_type": "review",
+      "execution_id": null,
+      "status": "success",
+      "cache_hit": null,
+      "output": {
+        "overall_quality": "good",
+        "score": 9,
+        "issues": [],
+        "positives": ["Codigo simples e legivel."],
+        "summary": "Sem problemas relevantes."
+      },
+      "error_message": null
+    }
+  ]
+}
+```
+
 ### Webhook opcional
 
 Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review`, `compliance`, `document` ou `tests` envia um `POST` JSON para a URL ao finalizar com sucesso ou falha. Falhas no callback sao registradas no historico como step `webhook_callback`, mas nao alteram a resposta principal.
@@ -239,6 +297,7 @@ src/
 │   ├── compliance/                 # Avaliacao de aderencia tarefa x codigo
 │   ├── document/                   # Documentacao tecnica de codigo
 │   ├── tests/                      # Geracao de estrategia e codigo de testes
+│   ├── batch/                      # Orquestracao sequencial dos fluxos
 │   ├── review/
 │   │   ├── engines/                # Review engine principal
 │   │   ├── graphs/                 # LangGraph (review-flow, review-language, per-language)
@@ -275,3 +334,4 @@ prisma/
 | `npm run lint`       | ESLint                             |
 | `npm run prisma:generate` | Gera Prisma Client            |
 | `npm run prisma:migrate`  | Cria migration (dev)           |
+| `npm run prisma:deploy`   | Aplica migrations em ambiente buildado |
