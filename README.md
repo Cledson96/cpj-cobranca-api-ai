@@ -6,6 +6,7 @@ API do case técnico CPJ-Cobrança para revisão automatizada de código usando 
 
 - **Revisão de código** multi-linguagem (TypeScript, JavaScript, Python, PHP) usando agentes especialistas paralelos com roteamento por linguagem
 - **Avaliação de aderência** entre tarefa e código implementado via fluxo `compliance`
+- **Documentação técnica** gerada a partir de código via fluxo `document`
 - **Grafos LangGraph** — orquestração de agentes especialistas (segurança, complexidade, resource leak, error handling, naming/clarity) com agregador final
 - **Ferramentas determinísticas** — análise estática complementar (regex patterns, lint-like checks)
 - **Histórico de execuções** — persistência em PostgreSQL via Prisma com steps e telemetria
@@ -13,11 +14,11 @@ API do case técnico CPJ-Cobrança para revisão automatizada de código usando 
 - **OpenAPI/Swagger UI** — docs interativos em `/docs`
 - **OpenRouter** — provedor LLM multi-modelo
 - **LangSmith** — tracing opcional (desligado por padrão)
-- **Webhook opcional** — callback ao concluir ou falhar execucoes de review/compliance
+- **Webhook opcional** — callback ao concluir ou falhar execucoes de review/compliance/document
 
 ## Estado Atual
 
-Os fluxos `review` e `compliance` estao implementados com endpoint HTTP, cache por hash, webhook opcional, historico persistido, telemetria do OpenRouter e Docker Compose. O fluxo `review` tambem possui streaming SSE. Os fluxos `document`, `tests` e `batch` ainda estao fora do escopo entregue nesta fase.
+Os fluxos `review`, `compliance` e `document` estao implementados com endpoint HTTP, cache por hash, webhook opcional, historico persistido, telemetria do OpenRouter e Docker Compose. O fluxo `review` tambem possui streaming SSE. Os fluxos `tests` e `batch` ainda estao fora do escopo entregue nesta fase.
 
 ## Stack
 
@@ -77,6 +78,7 @@ docker compose logs -f api
 | POST   | `/api/v1/review`    | Executa revisão de código          |
 | POST   | `/api/v1/review/stream` | Executa revisão via Server-Sent Events |
 | POST   | `/api/v1/compliance` | Avalia aderência entre tarefa e código |
+| POST   | `/api/v1/document` | Gera documentação técnica a partir de código |
 | GET    | `/api/v1/history`   | Lista últimas execuções            |
 | GET    | `/api/v1/history/:id` | Detalhes de uma execução         |
 | GET    | `/docs`             | Swagger UI (OpenAPI)               |
@@ -120,9 +122,40 @@ Resposta:
 }
 ```
 
+### POST /api/v1/document
+
+```json
+{
+  "code": "export function charge(amount: number) { return amount > 0; }",
+  "language": "typescript",
+  "title": "Servico de cobranca",
+  "audience": "developer",
+  "detail_level": "standard"
+}
+```
+
+Resposta:
+
+```json
+{
+  "title": "Servico de cobranca",
+  "summary": "Documenta a regra principal de cobranca.",
+  "documentation": "## Servico de cobranca\n\nUse `charge` para validar cobrancas.",
+  "public_api": [
+    {
+      "name": "charge",
+      "kind": "function",
+      "description": "Valida se uma cobranca tem valor positivo."
+    }
+  ],
+  "examples": ["charge(100)"],
+  "gaps": ["Nao foi possivel inferir persistencia."]
+}
+```
+
 ### Webhook opcional
 
-Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review` ou `compliance` envia um `POST` JSON para a URL ao finalizar com sucesso ou falha. Falhas no callback sao registradas no historico como step `webhook_callback`, mas nao alteram a resposta principal.
+Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review`, `compliance` ou `document` envia um `POST` JSON para a URL ao finalizar com sucesso ou falha. Falhas no callback sao registradas no historico como step `webhook_callback`, mas nao alteram a resposta principal.
 
 ```json
 {
@@ -171,6 +204,7 @@ src/
 ├── modules/
 │   ├── health/                     # Health check
 │   ├── compliance/                 # Avaliacao de aderencia tarefa x codigo
+│   ├── document/                   # Documentacao tecnica de codigo
 │   ├── review/
 │   │   ├── engines/                # Review engine principal
 │   │   ├── graphs/                 # LangGraph (review-flow, review-language, per-language)

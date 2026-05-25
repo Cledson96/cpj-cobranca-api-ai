@@ -9,6 +9,7 @@ import {
 import dayjs from "dayjs";
 import { handleUnknownError } from "@/infrastructure/errors";
 import type {
+  CreateCacheHitExecutionInput,
   CreatePendingExecutionInput,
   MarkExecutionFailedInput,
   MarkExecutionSuccessInput,
@@ -18,12 +19,21 @@ import type {
 import type { AppEnv, DocumentRequest, DocumentResponse } from "@shared";
 import { createPayloadHash, loadEnv } from "@shared";
 import { DocumentFlowGraph, type DocumentGraphRunner, type DocumentStepRecorder } from "../graphs";
+import {
+  HttpDocumentWebhookNotifier,
+  type DocumentWebhookNotifier,
+  type DocumentWebhookPayload,
+} from "./document-webhook.notifier";
 
 export interface DocumentExecutionPersistence extends DocumentStepRecorder {
   createPending(input: CreatePendingExecutionInput<DocumentRequest>): Promise<ReviewExecutionRecord>;
   markSuccess(input: MarkExecutionSuccessInput<DocumentResponse>): Promise<ReviewExecutionRecord>;
   markFailed(input: MarkExecutionFailedInput): Promise<ReviewExecutionRecord>;
   recordTelemetry(input: RecordReviewExecutionTelemetryInput): Promise<void>;
+  findSuccessByHash(requestHash: string): Promise<ReviewExecutionRecord | null>;
+  createCacheHit(
+    input: CreateCacheHitExecutionInput<DocumentRequest, DocumentResponse>,
+  ): Promise<ReviewExecutionRecord>;
 }
 
 export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentResponse> {
@@ -31,6 +41,7 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
     private readonly graph: DocumentGraphRunner,
     private readonly persistence?: DocumentExecutionPersistence,
     private readonly telemetrySource?: AgentExecutionTelemetrySource,
+    private readonly webhookNotifier?: DocumentWebhookNotifier,
   ) {
     super("document");
   }
@@ -52,6 +63,9 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
       DocumentFlowGraph.createDefault(structuredOutputRunner),
       input.persistence,
       telemetryCollector,
+      env.WEBHOOK_CALLBACK_URL
+        ? new HttpDocumentWebhookNotifier(env.WEBHOOK_CALLBACK_URL)
+        : undefined,
     );
   }
 
@@ -61,12 +75,60 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
     }
 
     const startedAt = dayjs().valueOf();
+    const hash = createPayloadHash(input);
+
+    try {
+      const cached = await this.persistence.findSuccessByHash(hash);
+      if (cached && cached.outputPayload) {
+        const durationMs = dayjs().valueOf() - startedAt;
+        const execution = await this.persistence.createCacheHit({
+          inputPayload: input,
+          requestHash: hash,
+          sourceExecutionId: cached.id,
+          outputPayload: cached.outputPayload as DocumentResponse,
+          durationMs,
+        });
+
+        await this.persistence.recordStep({
+          executionId: execution.id,
+          nodeName: "cache_lookup",
+          kind: "cache",
+          status: "success",
+          inputPayload: { requestHash: hash },
+          outputPayload: { cacheHit: true, sourceExecutionId: cached.id },
+          durationMs,
+        });
+
+        await this.notifyWebhook({
+          executionId: execution.id,
+          status: "success",
+          cacheHit: true,
+          output: cached.outputPayload as DocumentResponse,
+        });
+
+        return cached.outputPayload as DocumentResponse;
+      }
+    } catch {
+      // Falhas no cache nao impedem o fluxo principal
+    }
+
     const execution = await this.persistence.createPending({
       inputPayload: input,
-      requestHash: createPayloadHash(input),
+      requestHash: hash,
     });
 
     try {
+      const lookupDuration = dayjs().valueOf() - startedAt;
+      await this.persistence.recordStep({
+        executionId: execution.id,
+        nodeName: "cache_lookup",
+        kind: "cache",
+        status: "success",
+        inputPayload: { requestHash: hash },
+        outputPayload: { cacheHit: false },
+        durationMs: lookupDuration,
+      });
+
       const output = await this.graph.invoke(input, {
         executionId: execution.id,
         stepRecorder: this.persistence,
@@ -75,6 +137,12 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
         id: execution.id,
         outputPayload: output,
         durationMs: dayjs().valueOf() - startedAt,
+      });
+      await this.notifyWebhook({
+        executionId: execution.id,
+        status: "success",
+        cacheHit: false,
+        output,
       });
       await this.recordTelemetry(execution.id);
 
@@ -86,6 +154,12 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
         errorMessage: handledError.message,
         durationMs: dayjs().valueOf() - startedAt,
       });
+      await this.notifyWebhook({
+        executionId: execution.id,
+        status: "failed",
+        cacheHit: false,
+        errorMessage: handledError.message,
+      });
       throw handledError;
     }
   }
@@ -96,6 +170,68 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
 
   getTelemetrySource(): AgentExecutionTelemetrySource | undefined {
     return this.telemetrySource;
+  }
+
+  getWebhookNotifier(): DocumentWebhookNotifier | undefined {
+    return this.webhookNotifier;
+  }
+
+  private async notifyWebhook(input: {
+    executionId: string;
+    status: "success" | "failed";
+    cacheHit: boolean;
+    output?: DocumentResponse;
+    errorMessage?: string;
+  }): Promise<void> {
+    if (!this.persistence || !this.webhookNotifier) {
+      return;
+    }
+
+    const startedAt = dayjs().valueOf();
+    const payload: DocumentWebhookPayload = input.status === "success"
+      ? {
+          flow_type: "document",
+          execution_id: input.executionId,
+          status: "success",
+          cache_hit: input.cacheHit,
+          output: input.output as DocumentResponse,
+        }
+      : {
+          flow_type: "document",
+          execution_id: input.executionId,
+          status: "failed",
+          cache_hit: false,
+          error_message: input.errorMessage ?? "Erro desconhecido na documentacao.",
+        };
+
+    try {
+      await this.webhookNotifier.notify(payload);
+      await this.persistence.recordStep({
+        executionId: input.executionId,
+        nodeName: "webhook_callback",
+        kind: "webhook",
+        status: "success",
+        inputPayload: {
+          status: payload.status,
+          cacheHit: payload.cache_hit,
+        },
+        outputPayload: { delivered: true },
+        durationMs: dayjs().valueOf() - startedAt,
+      });
+    } catch (error) {
+      await this.persistence.recordStep({
+        executionId: input.executionId,
+        nodeName: "webhook_callback",
+        kind: "webhook",
+        status: "failed",
+        inputPayload: {
+          status: payload.status,
+          cacheHit: payload.cache_hit,
+        },
+        durationMs: dayjs().valueOf() - startedAt,
+        errorMessage: getErrorMessage(error),
+      });
+    }
   }
 
   private async recordTelemetry(executionId: string): Promise<void> {
@@ -127,4 +263,12 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
 
 function toNullableUsdString(value: number | null): string | null {
   return value === null ? null : value.toString();
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Erro desconhecido no webhook callback.";
 }

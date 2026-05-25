@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { DocumentEngine, type DocumentExecutionPersistence } from "@/modules/document/engines";
+import {
+  DocumentEngine,
+  type DocumentExecutionPersistence,
+  type DocumentWebhookNotifier,
+  type DocumentWebhookPayload,
+} from "@/modules/document/engines";
 import type { DocumentGraphRunContext, DocumentGraphRunner } from "@/modules/document/graphs";
 import type { DocumentRequest, DocumentResponse } from "@shared";
 import type {
+  CreateCacheHitExecutionInput,
   CreatePendingExecutionInput,
   MarkExecutionFailedInput,
   MarkExecutionSuccessInput,
@@ -37,8 +43,10 @@ const documentOutput: DocumentResponse = {
 
 class FakeDocumentGraph implements DocumentGraphRunner {
   lastContext?: DocumentGraphRunContext;
+  calls = 0;
 
   async invoke(_input: DocumentRequest, context?: DocumentGraphRunContext): Promise<DocumentResponse> {
+    this.calls += 1;
     this.lastContext = context;
     return documentOutput;
   }
@@ -52,10 +60,17 @@ class FailingDocumentGraph implements DocumentGraphRunner {
 
 class FakeDocumentExecutionPersistence implements DocumentExecutionPersistence {
   readonly pendingInputs: Array<CreatePendingExecutionInput<DocumentRequest>> = [];
+  readonly cacheHitInputs: Array<CreateCacheHitExecutionInput<DocumentRequest, DocumentResponse>> = [];
   readonly successInputs: Array<MarkExecutionSuccessInput<DocumentResponse>> = [];
   readonly failedInputs: MarkExecutionFailedInput[] = [];
   readonly stepInputs: RecordReviewExecutionStepInput[] = [];
   readonly telemetryInputs: RecordReviewExecutionTelemetryInput[] = [];
+  cachedRecord: ReviewExecutionRecord | null = null;
+
+  async findSuccessByHash(requestHash: string): Promise<ReviewExecutionRecord | null> {
+    void requestHash;
+    return this.cachedRecord;
+  }
 
   async createPending(input: CreatePendingExecutionInput<DocumentRequest>): Promise<ReviewExecutionRecord> {
     this.pendingInputs.push(input);
@@ -70,6 +85,25 @@ class FakeDocumentExecutionPersistence implements DocumentExecutionPersistence {
       requestHash: input.requestHash,
       cacheHit: false,
       sourceExecutionId: null,
+      errorMessage: null,
+    };
+  }
+
+  async createCacheHit(
+    input: CreateCacheHitExecutionInput<DocumentRequest, DocumentResponse>,
+  ): Promise<ReviewExecutionRecord> {
+    this.cacheHitInputs.push(input);
+    return {
+      id: "execution-cache-1",
+      createdAt: "2026-05-24T12:00:00.000Z",
+      flowType: "document",
+      status: "success",
+      inputPayload: input.inputPayload,
+      outputPayload: input.outputPayload,
+      durationMs: input.durationMs,
+      requestHash: input.requestHash,
+      cacheHit: true,
+      sourceExecutionId: input.sourceExecutionId,
       errorMessage: null,
     };
   }
@@ -133,6 +167,19 @@ class FakeTelemetrySource implements AgentExecutionTelemetrySource {
   }
 }
 
+class FakeDocumentWebhookNotifier implements DocumentWebhookNotifier {
+  readonly payloads: DocumentWebhookPayload[] = [];
+
+  constructor(private readonly failWith?: Error) {}
+
+  async notify(payload: DocumentWebhookPayload): Promise<void> {
+    this.payloads.push(payload);
+    if (this.failWith) {
+      throw this.failWith;
+    }
+  }
+}
+
 describe("DocumentEngine com persistencia", () => {
   it("cria execucao pendente, envia contexto ao grafo e marca sucesso", async () => {
     const graph = new FakeDocumentGraph();
@@ -158,6 +205,70 @@ describe("DocumentEngine com persistencia", () => {
       modelRequested: "openai/gpt-4o-mini",
       openrouterGenerationId: "gen-doc-1",
     });
+  });
+
+  it("envia webhook de sucesso e registra step quando callback esta configurado", async () => {
+    const graph = new FakeDocumentGraph();
+    const persistence = new FakeDocumentExecutionPersistence();
+    const webhookNotifier = new FakeDocumentWebhookNotifier();
+    const engine = new DocumentEngine(graph, persistence, undefined, webhookNotifier);
+
+    await engine.execute(documentInput);
+
+    expect(webhookNotifier.payloads).toEqual([
+      {
+        flow_type: "document",
+        execution_id: "execution-1",
+        status: "success",
+        cache_hit: false,
+        output: documentOutput,
+      },
+    ]);
+    expect(persistence.stepInputs.find((step) => step.nodeName === "webhook_callback")).toMatchObject({
+      executionId: "execution-1",
+      kind: "webhook",
+      status: "success",
+      inputPayload: { status: "success", cacheHit: false },
+      outputPayload: { delivered: true },
+    });
+  });
+
+  it("usa cache hit isolado de document e envia webhook com cache_hit true", async () => {
+    const graph = new FakeDocumentGraph();
+    const persistence = new FakeDocumentExecutionPersistence();
+    const webhookNotifier = new FakeDocumentWebhookNotifier();
+    persistence.cachedRecord = {
+      id: "execution-original",
+      createdAt: "2026-05-24T12:00:00.000Z",
+      flowType: "document",
+      status: "success",
+      inputPayload: documentInput,
+      outputPayload: documentOutput,
+      durationMs: 900,
+      requestHash: "hash-original",
+      cacheHit: false,
+      sourceExecutionId: null,
+      errorMessage: null,
+    };
+    const engine = new DocumentEngine(graph, persistence, undefined, webhookNotifier);
+
+    const output = await engine.execute(documentInput);
+
+    expect(output).toEqual(documentOutput);
+    expect(graph.calls).toBe(0);
+    expect(persistence.cacheHitInputs[0]).toMatchObject({
+      sourceExecutionId: "execution-original",
+      outputPayload: documentOutput,
+    });
+    expect(webhookNotifier.payloads).toEqual([
+      {
+        flow_type: "document",
+        execution_id: "execution-cache-1",
+        status: "success",
+        cache_hit: true,
+        output: documentOutput,
+      },
+    ]);
   });
 
   it("marca execucao como falha quando o grafo quebra", async () => {
