@@ -9,6 +9,7 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 - **Avaliação de aderência** entre tarefa e código implementado via fluxo `compliance`
 - **Documentação técnica ou operacional** gerada a partir de código via fluxo `document`
 - **Geração de testes** via fluxo `tests`, com casos classificados e arquivo de teste
+- **Geração de testes por Pull Request** via GitHub, criando testes unitarios para funcoes criticas alteradas
 - **Execução em lote** via fluxo `batch`, orquestrando `review`, `compliance`, `document` e `tests`
 - **Gestão de prompts no banco** — cadastro, consulta, ativação e override por versão via `prompt_version`
 - **Catálogo de modelos no banco** — cadastro, edição, exclusão e seleção de modelo padrão global com override por request via `model`
@@ -23,7 +24,7 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 
 ## Estado Atual
 
-Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementados com endpoint HTTP, Docker Compose e documentacao OpenAPI. Alem deles, o fluxo `pull_request_review` busca contexto no GitHub e Jira opcional. Os fluxos individuais possuem cache por hash, webhook opcional, historico persistido e telemetria do OpenRouter. O fluxo `review` tambem possui streaming SSE, o `batch` executa os fluxos prontos em sequencia com resumo persistido e metadados por item, os prompts ativos passam a ser resolvidos de tabelas versionadas no PostgreSQL e o modelo LLM usado em cada execucao sai de um catalogo persistido com padrao global configuravel.
+Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementados com endpoint HTTP, Docker Compose e documentacao OpenAPI. Alem deles, o fluxo `pull_request_review` busca contexto no GitHub e Jira opcional, e o endpoint de testes por Pull Request gera testes unitarios para funcoes criticas alteradas. Os fluxos individuais possuem cache por hash, webhook opcional, historico persistido e telemetria do OpenRouter. O fluxo `review` tambem possui streaming SSE, o `batch` executa os fluxos prontos em sequencia com resumo persistido e metadados por item, os prompts ativos passam a ser resolvidos de tabelas versionadas no PostgreSQL e o modelo LLM usado em cada execucao sai de um catalogo persistido com padrao global configuravel.
 
 ## Stack
 
@@ -103,6 +104,7 @@ docker compose logs -f api
 | POST   | `/api/v1/compliance` | Avalia aderência entre tarefa e código |
 | POST   | `/api/v1/document` | Gera documentação técnica ou operacional |
 | POST   | `/api/v1/tests`    | Gera arquivo e casos de teste     |
+| POST   | `/api/v1/tests/pull-request` | Gera testes unitarios baseados em Pull Request |
 | POST   | `/api/v1/batch`    | Executa varios fluxos em sequencia     |
 | GET    | `/api/v1/history`   | Lista últimas execuções            |
 | GET    | `/api/v1/history/:id` | Detalhes de uma execução         |
@@ -240,6 +242,31 @@ Resposta:
     }
   ],
   "coverage_hints": ["Adicionar teste para amount <= 0 quando houver regra de erro."]
+}
+```
+
+### POST /api/v1/tests/pull-request
+
+```json
+{
+  "github_pull_request_url": "https://github.com/org/repo/pull/123",
+  "base_branch": "main",
+  "test_framework": "vitest",
+  "prompt_version": 5,
+  "model": "openai/gpt-4o-mini"
+}
+```
+
+Busca o PR no GitHub, infere a linguagem principal pelos arquivos alterados, identifica funcoes/branches/casos de erro criticos no diff e retorna um arquivo de teste unitario no framework informado.
+
+Resposta igual ao endpoint `/api/v1/tests`:
+
+```json
+{
+  "framework": "vitest",
+  "test_file": "import { describe, expect, it } from 'vitest';\n...",
+  "test_cases": [],
+  "coverage_hints": []
 }
 ```
 

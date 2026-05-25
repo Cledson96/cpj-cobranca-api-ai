@@ -6,5 +6,6 @@ export * from "./history";
 export * from "./models";
 export * from "./prompts";
 export * from "./pull-request-review";
+export * from "./pull-request-tests";
 export * from "./review";
 export * from "./tests";

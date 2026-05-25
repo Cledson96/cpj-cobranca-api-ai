@@ -49,6 +49,12 @@ describe("OpenAPI", () => {
             summary: expect.any(String),
           },
         },
+        "/api/v1/tests/pull-request": {
+          post: {
+            tags: ["Tests"],
+            summary: expect.any(String),
+          },
+        },
         "/api/v1/batch": {
           post: {
             tags: ["Batch"],

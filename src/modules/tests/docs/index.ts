@@ -1,4 +1,4 @@
-import { testsRequestSchema, testsResponseSchema } from "@shared";
+import { pullRequestTestsRequestSchema, testsRequestSchema, testsResponseSchema } from "@shared";
 import { toOpenApiSchema } from "@/infrastructure/openapi";
 
 export const testsRouteDocs = {
@@ -32,4 +32,13 @@ export const testsRouteDocs = {
       required: ["error", "message"],
     },
   },
+};
+
+export const pullRequestTestsRouteDocs = {
+  summary: "Gera testes unitarios a partir de um pull request",
+  description:
+    "Busca um pull request no GitHub, identifica funcoes criticas alteradas e retorna arquivo de testes unitarios focado no framework informado.",
+  tags: ["Tests"],
+  body: toOpenApiSchema(pullRequestTestsRequestSchema),
+  response: testsRouteDocs.response,
 };
