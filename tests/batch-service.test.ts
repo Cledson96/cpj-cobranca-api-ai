@@ -1,0 +1,116 @@
+import { describe, expect, it, vi } from "vitest";
+import { DefaultBatchService } from "@/modules/batch/services";
+import type { BatchRequest } from "@shared";
+
+const reviewOutput = {
+  overall_quality: "good",
+  score: 9,
+  issues: [],
+  positives: ["Simples."],
+  summary: "ok",
+};
+
+const testsOutput = {
+  framework: "vitest",
+  strategy_summary: "Cobrir caminho feliz.",
+  test_cases: [],
+  test_code: "import { it } from 'vitest';",
+  gaps: [],
+};
+
+const batchInput: BatchRequest = {
+  continue_on_error: true,
+  notify: false,
+  items: [
+    {
+      flow_type: "review",
+      payload: {
+        code: "function sum(a, b) { return a + b; }",
+        language: "javascript",
+      },
+    },
+    {
+      flow_type: "tests",
+      payload: {
+        code: "export function sum(a: number, b: number) { return a + b; }",
+        language: "typescript",
+        framework: "vitest",
+      },
+    },
+  ],
+};
+
+describe("DefaultBatchService", () => {
+  it("executa fluxos sequencialmente e retorna success quando todos passam", async () => {
+    const reviewService = { execute: vi.fn().mockResolvedValue(reviewOutput) };
+    const testsService = { execute: vi.fn().mockResolvedValue(testsOutput) };
+    const batchRepository = { createSummary: vi.fn().mockResolvedValue(undefined) };
+    const service = new DefaultBatchService({
+      reviewService,
+      complianceService: { execute: vi.fn() },
+      documentService: { execute: vi.fn() },
+      testsService,
+      batchRepository,
+    });
+
+    const output = await service.execute(batchInput);
+
+    expect(output.status).toBe("success");
+    expect(output.results).toMatchObject([
+      { index: 0, flow_type: "review", status: "success", output: reviewOutput },
+      { index: 1, flow_type: "tests", status: "success", output: testsOutput },
+    ]);
+    expect(reviewService.execute).toHaveBeenCalledWith(batchInput.items[0]?.payload);
+    expect(testsService.execute).toHaveBeenCalledWith(batchInput.items[1]?.payload);
+    expect(batchRepository.createSummary).toHaveBeenCalledWith({
+      id: output.batch_id,
+      status: "success",
+      itemCount: 2,
+      successCount: 2,
+      failedCount: 0,
+      durationMs: expect.any(Number),
+    });
+  });
+
+  it("continua apos erro quando continue_on_error e true e marca partial", async () => {
+    const reviewService = { execute: vi.fn().mockRejectedValue(new Error("falha review")) };
+    const testsService = { execute: vi.fn().mockResolvedValue(testsOutput) };
+    const service = new DefaultBatchService({
+      reviewService,
+      complianceService: { execute: vi.fn() },
+      documentService: { execute: vi.fn() },
+      testsService,
+    });
+
+    const output = await service.execute(batchInput);
+
+    expect(output.status).toBe("partial");
+    expect(output.results).toMatchObject([
+      { index: 0, flow_type: "review", status: "failed", error_message: "falha review" },
+      { index: 1, flow_type: "tests", status: "success", output: testsOutput },
+    ]);
+    expect(testsService.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("para no primeiro erro quando continue_on_error e false", async () => {
+    const reviewService = { execute: vi.fn().mockRejectedValue(new Error("falha review")) };
+    const testsService = { execute: vi.fn().mockResolvedValue(testsOutput) };
+    const service = new DefaultBatchService({
+      reviewService,
+      complianceService: { execute: vi.fn() },
+      documentService: { execute: vi.fn() },
+      testsService,
+    });
+
+    const output = await service.execute({
+      ...batchInput,
+      continue_on_error: false,
+    });
+
+    expect(output.status).toBe("failed");
+    expect(output.results).toMatchObject([
+      { index: 0, flow_type: "review", status: "failed", error_message: "falha review" },
+    ]);
+    expect(testsService.execute).not.toHaveBeenCalled();
+  });
+});
