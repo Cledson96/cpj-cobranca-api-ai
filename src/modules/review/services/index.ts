@@ -20,16 +20,9 @@ export class DefaultReviewService implements ReviewService {
   }
 
   async execute(input: ReviewRequest): Promise<ReviewResponse> {
-    return this.getReviewEngine().execute(input);
-  }
-
-  private getReviewEngine(): ReviewEngine {
-    if (!this.reviewEngine) {
-      this.reviewEngine = ReviewEngine.createDefault({
-        persistence: this.executionPersistence,
-      });
-    }
-
-    return this.reviewEngine;
+    const engine = this.reviewEngine ?? ReviewEngine.createDefault({
+      persistence: this.executionPersistence,
+    });
+    return engine.execute(input);
   }
 }
