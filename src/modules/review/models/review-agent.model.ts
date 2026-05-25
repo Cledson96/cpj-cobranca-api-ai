@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ReviewRequest } from "@shared";
 import type { LanguageProfile } from "../language";
+import type { ReviewPromptCatalog } from "../prompts";
 
 const nonEmptyString = () => z.string().trim().min(1);
 
@@ -25,4 +26,5 @@ export type ReviewAnalysisContext = {
   languageProfile: LanguageProfile;
   deterministicFindings: ReviewFinding[];
   agentOutputs: SpecialistAgentOutput[];
+  promptCatalog?: ReviewPromptCatalog;
 };

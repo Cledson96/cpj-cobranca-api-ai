@@ -18,7 +18,8 @@ Content-Type: application/json
 {
   "code": "function calculateTotal(items: { price: number; quantity: number }[]): number {\n  return items.reduce((sum, item) => {\n    return sum + item.price * item.quantity;\n  }, 0);\n}",
   "language": "typescript",
-  "context": "Funcao de calculo de total em carrinho de compras"
+  "context": "Funcao de calculo de total em carrinho de compras",
+  "prompt_version": 2
 }
 
 ### -----------------------
@@ -66,7 +67,8 @@ Content-Type: application/json
 {
   "task_description": "Permitir renegociacao apenas para contratos ativos e registrar auditoria.",
   "code": "if (contract.active) { renegotiate(contract); audit(contract.id); }",
-  "language": "typescript"
+  "language": "typescript",
+  "prompt_version": 3
 }
 
 ### -----------------------
@@ -78,7 +80,8 @@ Content-Type: application/json
 {
   "code": "export async function chargeCustomer(customerId: string, amount: number) { if (amount <= 0) throw new Error('invalid amount'); await repository.save({ customerId, amount }); return { approved: true }; }",
   "language": "typescript",
-  "doc_type": "technical"
+  "doc_type": "technical",
+  "prompt_version": 2
 }
 
 ### -----------------------
@@ -90,8 +93,41 @@ Content-Type: application/json
 {
   "code": "export function charge(amount: number) { if (amount <= 0) throw new Error('invalid amount'); return amount > 0; }",
   "language": "typescript",
-  "test_framework": "vitest"
+  "test_framework": "vitest",
+  "prompt_version": 5
 }
+
+### -----------------------
+### GET Prompt Versions
+### -----------------------
+GET {{baseUrl}}/api/v1/prompts?flow_type=review
+
+### -----------------------
+### GET Active Prompt Version
+### -----------------------
+GET {{baseUrl}}/api/v1/prompts/review/active
+
+### -----------------------
+### POST Create Prompt Version
+### -----------------------
+POST {{baseUrl}}/api/v1/prompts
+Content-Type: application/json
+
+{
+  "flow_type": "document",
+  "name": "Document v2",
+  "blocks": [
+    {
+      "block_key": "agent",
+      "system_prompt": "Voce gera documentacao tecnica usando o contexto {{language_context}}."
+    }
+  ]
+}
+
+### -----------------------
+### POST Activate Prompt Version
+### -----------------------
+POST {{baseUrl}}/api/v1/prompts/document/2/activate
 
 ### -----------------------
 ### POST Batch

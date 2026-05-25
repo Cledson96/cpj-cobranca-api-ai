@@ -22,7 +22,7 @@ export class DocumentAgent extends BaseSpecialistAgent<DocumentResponse, Documen
   }
 
   protected buildSystemPrompt(context: DocumentAnalysisContext): string {
-    return this.promptCatalog.getAgentSystemPrompt([
+    return (context.promptCatalog ?? this.promptCatalog).getAgentSystemPrompt([
       `Linguagem: ${context.input.language}`,
       `Tipo de documentacao: ${context.input.doc_type}`,
     ].join("\n"));

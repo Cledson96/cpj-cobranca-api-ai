@@ -1,6 +1,8 @@
 import { z } from "zod";
 import promptData from "./review-prompts.json";
 
+const LANGUAGE_CONTEXT_PLACEHOLDER = "{{language_context}}";
+
 const reviewPromptExampleSchema = z.object({
   title: z.string().trim().min(1),
   input: z.string().trim().min(1),
@@ -30,34 +32,63 @@ const reviewPromptCatalogSchema = z.object({
 
 type ReviewPromptCatalogData = z.infer<typeof reviewPromptCatalogSchema>;
 type ReviewPromptEntry = z.infer<typeof reviewPromptEntrySchema>;
+type ReviewPromptTemplates = {
+  specialists: Record<SpecialistPromptKey, string>;
+  aggregator: string;
+};
 
 export class ReviewPromptCatalog {
-  private constructor(private readonly data: ReviewPromptCatalogData) {}
+  private constructor(private readonly templates: ReviewPromptTemplates) {}
 
   static default(): ReviewPromptCatalog {
-    return new ReviewPromptCatalog(reviewPromptCatalogSchema.parse(promptData));
+    const parsed = reviewPromptCatalogSchema.parse(promptData);
+    return new ReviewPromptCatalog(this.createTemplates(parsed));
+  }
+
+  static fromTemplates(templates: ReviewPromptTemplates): ReviewPromptCatalog {
+    return new ReviewPromptCatalog(templates);
+  }
+
+  static defaultTemplates(): ReviewPromptTemplates {
+    const parsed = reviewPromptCatalogSchema.parse(promptData);
+    return this.createTemplates(parsed);
   }
 
   getSpecialistSystemPrompt(
     promptKey: SpecialistPromptKey,
     languageContext: string,
   ): string {
-    const entry = this.data.specialists[promptKey];
-    if (!entry) {
+    const template = this.templates.specialists[promptKey];
+    if (!template) {
       throw new Error(`Prompt de especialista nao encontrado: ${promptKey}`);
     }
 
-    return this.formatEntry(entry, languageContext);
+    return template.replace(LANGUAGE_CONTEXT_PLACEHOLDER, languageContext);
   }
 
   getAggregatorSystemPrompt(languageContext: string): string {
-    return this.formatEntry(this.data.aggregator, languageContext);
+    return this.templates.aggregator.replace(LANGUAGE_CONTEXT_PLACEHOLDER, languageContext);
   }
 
-  private formatEntry(entry: ReviewPromptEntry, languageContext: string): string {
+  private static createTemplates(data: ReviewPromptCatalogData): ReviewPromptTemplates {
+    const specialists = data.specialists as Record<SpecialistPromptKey, ReviewPromptEntry>;
+
+    return {
+      specialists: {
+        naming_clarity: this.createTemplate(specialists.naming_clarity),
+        error_handling: this.createTemplate(specialists.error_handling),
+        resource_leak: this.createTemplate(specialists.resource_leak),
+        complexity: this.createTemplate(specialists.complexity),
+        security: this.createTemplate(specialists.security),
+      },
+      aggregator: this.createTemplate(data.aggregator),
+    };
+  }
+
+  private static createTemplate(entry: ReviewPromptEntry): string {
     const sections = [
       entry.role,
-      languageContext,
+      LANGUAGE_CONTEXT_PLACEHOLDER,
       this.formatInstructions(entry.instructions),
     ];
 
@@ -68,14 +99,14 @@ export class ReviewPromptCatalog {
     return sections.join("\n\n");
   }
 
-  private formatInstructions(instructions: string[]): string {
+  private static formatInstructions(instructions: string[]): string {
     return [
       "Instrucoes:",
       ...instructions.map((instruction) => `- ${instruction}`),
     ].join("\n");
   }
 
-  private formatExamples(examples: ReviewPromptEntry["examples"]): string {
+  private static formatExamples(examples: ReviewPromptEntry["examples"]): string {
     return [
       "Exemplos:",
       ...examples.map((example) => [

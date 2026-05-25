@@ -4,6 +4,9 @@
   "private": true,
   "description": "API do case CPJ-Cobranca com agente de IA, Fastify, LangGraph, OpenRouter e LangSmith.",
   "type": "module",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",

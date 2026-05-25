@@ -1,4 +1,5 @@
 import type { DocumentRequest, DocumentResponse } from "@shared";
+import type { DocumentPromptCatalog } from "@/modules/document/prompts";
 
 export type DocumentPublicApiCandidate = {
   name: string;
@@ -21,6 +22,7 @@ export type DocumentToolResult = {
 export type DocumentAnalysisContext = {
   input: DocumentRequest;
   toolResult: DocumentToolResult;
+  promptCatalog?: DocumentPromptCatalog;
 };
 
 export interface DocumentAgentLike {

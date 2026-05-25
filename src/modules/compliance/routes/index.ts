@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { AgentExecutionRepository } from "@/modules/executions";
+import { DefaultPromptsService, PrismaPromptVersionRepository, type PromptRuntimeResolver } from "@/modules/prompts";
 import { ComplianceController } from "@/modules/compliance/controllers";
 import { complianceRouteDocs } from "@/modules/compliance/docs";
 import { DefaultComplianceService, type ComplianceService } from "@/modules/compliance/services";
@@ -7,6 +8,7 @@ import type { ComplianceRequest, ComplianceResponse } from "@shared";
 
 export type ComplianceRoutesDependencies = {
   complianceService?: ComplianceService;
+  promptResolver?: PromptRuntimeResolver;
 };
 
 export class ComplianceRoutes {
@@ -35,11 +37,15 @@ export class ComplianceRoutes {
     }
 
     if ("prisma" in app) {
+      const promptResolver = this.dependencies.promptResolver
+        ?? new DefaultPromptsService(new PrismaPromptVersionRepository(app.prisma));
+
       return new DefaultComplianceService({
         executionPersistence: new AgentExecutionRepository<ComplianceRequest, ComplianceResponse>(
           app.prisma,
           "compliance",
         ),
+        promptResolver,
       });
     }
 

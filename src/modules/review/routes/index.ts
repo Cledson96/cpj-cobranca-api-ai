@@ -1,11 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { ReviewExecutionRepository } from "@/modules/executions";
+import { DefaultPromptsService, PrismaPromptVersionRepository, type PromptRuntimeResolver } from "@/modules/prompts";
 import { ReviewController } from "@/modules/review/controllers";
 import { reviewRouteDocs, reviewStreamRouteDocs } from "@/modules/review/docs";
 import { DefaultReviewService, type ReviewService } from "@/modules/review/services";
 
 export type ReviewRoutesDependencies = {
   reviewService?: ReviewService;
+  promptResolver?: PromptRuntimeResolver;
 };
 
 export class ReviewRoutes {
@@ -43,8 +45,12 @@ export class ReviewRoutes {
     }
 
     if ("prisma" in app) {
+      const promptResolver = this.dependencies.promptResolver
+        ?? new DefaultPromptsService(new PrismaPromptVersionRepository(app.prisma));
+
       return new DefaultReviewService({
         executionPersistence: new ReviewExecutionRepository(app.prisma),
+        promptResolver,
       });
     }
 

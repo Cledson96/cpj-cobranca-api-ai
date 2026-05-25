@@ -19,11 +19,13 @@ import type {
 import type { AppEnv, ComplianceRequest, ComplianceResponse } from "@shared";
 import { createPayloadHash, loadEnv } from "@shared";
 import { ComplianceFlowGraph, type ComplianceGraphRunner, type ComplianceStepRecorder } from "../graphs";
+import { CompliancePromptCatalog } from "../prompts";
 import {
   HttpComplianceWebhookNotifier,
   type ComplianceWebhookNotifier,
   type ComplianceWebhookPayload,
 } from "./compliance-webhook.notifier";
+import { LegacyPromptRuntimeResolver, type PromptRuntimeResolver } from "@/modules/prompts";
 
 export interface ComplianceExecutionPersistence extends ComplianceStepRecorder {
   createPending(input: CreatePendingExecutionInput<ComplianceRequest>): Promise<ReviewExecutionRecord>;
@@ -42,6 +44,7 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
     private readonly persistence?: ComplianceExecutionPersistence,
     private readonly telemetrySource?: AgentExecutionTelemetrySource,
     private readonly webhookNotifier?: ComplianceWebhookNotifier,
+    private readonly promptResolver: PromptRuntimeResolver = new LegacyPromptRuntimeResolver(),
   ) {
     super("compliance");
   }
@@ -49,6 +52,7 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
   static createDefault(input: {
     env?: AppEnv;
     persistence?: ComplianceExecutionPersistence;
+    promptResolver?: PromptRuntimeResolver;
   } = {}): ComplianceEngine {
     const env = input.env ?? loadEnv();
     const chatModel = new OpenRouterChatFactory(env).create();
@@ -66,12 +70,16 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
       env.WEBHOOK_CALLBACK_URL
         ? new HttpComplianceWebhookNotifier(env.WEBHOOK_CALLBACK_URL)
         : undefined,
+      input.promptResolver ?? new LegacyPromptRuntimeResolver(),
     );
   }
 
   protected async invoke(input: ComplianceRequest): Promise<ComplianceResponse> {
+    const promptSet = await this.promptResolver.resolveCompliance(input.prompt_version);
+    const promptCatalog = CompliancePromptCatalog.fromTemplate(promptSet.agent);
+
     if (!this.persistence) {
-      return this.graph.invoke(input);
+      return this.graph.invoke(input, { promptCatalog });
     }
 
     const startedAt = dayjs().valueOf();
@@ -132,6 +140,7 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
       const output = await this.graph.invoke(input, {
         executionId: execution.id,
         stepRecorder: this.persistence,
+        promptCatalog,
       });
       await this.persistence.markSuccess({
         id: execution.id,

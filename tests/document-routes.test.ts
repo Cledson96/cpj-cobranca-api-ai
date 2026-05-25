@@ -7,6 +7,7 @@ const validPayload: DocumentRequest = {
   code: "export function charge(amount: number) { return amount > 0; }",
   language: "typescript",
   doc_type: "technical",
+  prompt_version: 2,
 };
 
 const documentResponse: DocumentResponse = {

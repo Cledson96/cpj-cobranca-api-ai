@@ -17,6 +17,7 @@ import type {
 } from "@/modules/executions";
 import type { AppEnv, ReviewRequest, ReviewResponse } from "@shared";
 import { createPayloadHash, loadEnv } from "@shared";
+import { ReviewPromptCatalog } from "../prompts";
 import { LanguageRouter } from "../language";
 import {
   ReviewFlowGraph,
@@ -32,6 +33,7 @@ import {
   type ReviewWebhookNotifier,
   type ReviewWebhookPayload,
 } from "./review-webhook.notifier";
+import { LegacyPromptRuntimeResolver, type PromptRuntimeResolver } from "@/modules/prompts";
 
 export interface ReviewExecutionPersistence extends ReviewStepRecorder {
   createPending(input: CreatePendingReviewExecutionInput): Promise<ReviewExecutionRecord>;
@@ -54,6 +56,7 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
     private readonly persistence?: ReviewExecutionPersistence,
     private readonly telemetrySource?: AgentExecutionTelemetrySource,
     private readonly webhookNotifier?: ReviewWebhookNotifier,
+    private readonly promptResolver: PromptRuntimeResolver = new LegacyPromptRuntimeResolver(),
   ) {
     super("review");
   }
@@ -61,6 +64,7 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
   static createDefault(input: {
     env?: AppEnv;
     persistence?: ReviewExecutionPersistence;
+    promptResolver?: PromptRuntimeResolver;
   } = {}): ReviewEngine {
     const env = input.env ?? loadEnv();
     const chatModel = new OpenRouterChatFactory(env).create();
@@ -86,12 +90,25 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
       env.WEBHOOK_CALLBACK_URL
         ? new HttpReviewWebhookNotifier(env.WEBHOOK_CALLBACK_URL)
         : undefined,
+      input.promptResolver ?? new LegacyPromptRuntimeResolver(),
     );
   }
 
   protected async invoke(input: ReviewRequest): Promise<ReviewResponse> {
+    const promptSet = await this.promptResolver.resolveReview(input.prompt_version);
+    const promptCatalog = ReviewPromptCatalog.fromTemplates({
+      specialists: {
+        naming_clarity: promptSet.naming_clarity,
+        error_handling: promptSet.error_handling,
+        resource_leak: promptSet.resource_leak,
+        complexity: promptSet.complexity,
+        security: promptSet.security,
+      },
+      aggregator: promptSet.aggregator,
+    });
+
     if (!this.persistence) {
-      return this.graph.invoke(input);
+      return this.graph.invoke(input, { promptCatalog });
     }
 
     const startedAt = dayjs().valueOf();
@@ -152,6 +169,7 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
       const output = await this.graph.invoke(input, {
         executionId: execution.id,
         stepRecorder: this.persistence,
+        promptCatalog,
       });
       await this.persistence.markSuccess({
         id: execution.id,
@@ -278,6 +296,10 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
 
   getWebhookNotifier(): ReviewWebhookNotifier | undefined {
     return this.webhookNotifier;
+  }
+
+  getPromptResolver(): PromptRuntimeResolver {
+    return this.promptResolver;
   }
 }
 

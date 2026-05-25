@@ -12,6 +12,7 @@ import type {
 import { DocumentAgent } from "@/modules/document/agents";
 import { DeterministicDocumentToolsRunner } from "@/modules/document/tools";
 import type { StructuredOutputRunner } from "@/modules/agent";
+import type { DocumentPromptCatalog } from "@/modules/document/prompts";
 
 export type DocumentStepRecorder = {
   recordStep(input: RecordReviewExecutionStepInput): Promise<void>;
@@ -20,6 +21,7 @@ export type DocumentStepRecorder = {
 export type DocumentGraphRunContext = {
   executionId?: string;
   stepRecorder?: DocumentStepRecorder;
+  promptCatalog?: DocumentPromptCatalog;
 };
 
 export interface DocumentGraphRunner {
@@ -34,6 +36,7 @@ export type DocumentFlowGraphDependencies = {
 const DocumentFlowAnnotation = Annotation.Root({
   input: Annotation<DocumentRequest>,
   executionId: Annotation<string | undefined>,
+  promptCatalog: Annotation<DocumentPromptCatalog | undefined>,
   toolResult: Annotation<DocumentToolResult | undefined>,
   output: Annotation<DocumentResponse | undefined>,
 });
@@ -62,6 +65,7 @@ export class DocumentFlowGraph implements DocumentGraphRunner {
       {
         input,
         executionId: context.executionId,
+        promptCatalog: context.promptCatalog,
       },
       {
         configurable: {
@@ -155,6 +159,7 @@ export class DocumentFlowGraph implements DocumentGraphRunner {
     return {
       input: state.input,
       toolResult: state.toolResult,
+      promptCatalog: state.promptCatalog,
     };
   }
 

@@ -6,6 +6,7 @@ import type { ReviewRequest, ReviewResponse } from "@shared";
 import dayjs from "dayjs";
 import type { RecordReviewExecutionStepInput } from "@/modules/executions";
 import { LanguageRouter, type ReviewLanguageRoute } from "../language";
+import type { ReviewPromptCatalog } from "../prompts";
 import type { ReviewGraphNode } from "../language";
 import type { ReviewLanguageGraph, ReviewLanguageGraphContext } from "./review-language.graph";
 
@@ -16,6 +17,7 @@ export type ReviewStepRecorder = {
 export type ReviewGraphRunContext = {
   executionId?: string;
   stepRecorder?: ReviewStepRecorder;
+  promptCatalog?: ReviewPromptCatalog;
 };
 
 export interface ReviewGraphRunner {
@@ -37,6 +39,7 @@ export type ReviewFlowGraphDependencies = {
 const ReviewFlowAnnotation = Annotation.Root({
   input: Annotation<ReviewRequest>,
   executionId: Annotation<string | undefined>,
+  promptCatalog: Annotation<ReviewPromptCatalog | undefined>,
   route: Annotation<ReviewLanguageRoute | undefined>,
   output: Annotation<ReviewResponse | undefined>,
 });
@@ -60,6 +63,7 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
       {
         input,
         executionId: context.executionId,
+        promptCatalog: context.promptCatalog,
       },
       {
         configurable: {
@@ -168,6 +172,7 @@ export class ReviewFlowGraph extends BaseFlowGraph<ReviewRequest, ReviewResponse
       languageProfile: state.route.profile,
       executionId: state.executionId,
       stepRecorder,
+      promptCatalog: state.promptCatalog,
     };
     const startedAt = dayjs().valueOf();
 

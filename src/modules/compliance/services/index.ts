@@ -1,6 +1,7 @@
 import { createPayloadHash, type ComplianceRequest, type ComplianceResponse } from "@shared";
 import { ComplianceEngine, type ComplianceExecutionPersistence } from "@/modules/compliance/engines";
 import type { FlowExecutionMetadata, ReviewExecutionRecord } from "@/modules/executions";
+import type { PromptRuntimeResolver } from "@/modules/prompts";
 
 export interface ComplianceService {
   execute(input: ComplianceRequest): Promise<ComplianceResponse>;
@@ -10,20 +11,24 @@ export interface ComplianceService {
 export type DefaultComplianceServiceDependencies = {
   complianceEngine?: ComplianceEngine;
   executionPersistence?: ComplianceExecutionPersistence;
+  promptResolver?: PromptRuntimeResolver;
 };
 
 export class DefaultComplianceService implements ComplianceService {
   private readonly complianceEngine?: ComplianceEngine;
   private readonly executionPersistence?: ComplianceExecutionPersistence;
+  private readonly promptResolver?: PromptRuntimeResolver;
 
   constructor(dependencies: DefaultComplianceServiceDependencies = {}) {
     this.complianceEngine = dependencies.complianceEngine;
     this.executionPersistence = dependencies.executionPersistence;
+    this.promptResolver = dependencies.promptResolver;
   }
 
   async execute(input: ComplianceRequest): Promise<ComplianceResponse> {
     const engine = this.complianceEngine ?? ComplianceEngine.createDefault({
       persistence: this.executionPersistence,
+      promptResolver: this.promptResolver,
     });
 
     return engine.execute(input);

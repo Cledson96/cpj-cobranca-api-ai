@@ -11,6 +11,7 @@ export const testsRequestSchema = z.object({
   code: nonEmptyString(),
   language: supportedLanguageSchema,
   test_framework: testsFrameworkSchema,
+  prompt_version: z.number().int().min(1).optional(),
 });
 export type TestsRequest = z.infer<typeof testsRequestSchema>;
 

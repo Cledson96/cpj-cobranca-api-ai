@@ -1,6 +1,8 @@
 import { z } from "zod";
 import promptData from "./tests-prompts.json";
 
+const LANGUAGE_CONTEXT_PLACEHOLDER = "{{language_context}}";
+
 const testsPromptExampleSchema = z.object({
   title: z.string().trim().min(1),
   input: z.string().trim().min(1),
@@ -17,24 +19,33 @@ const testsPromptCatalogSchema = z.object({
   agent: testsPromptEntrySchema,
 });
 
-type TestsPromptCatalogData = z.infer<typeof testsPromptCatalogSchema>;
 type TestsPromptEntry = z.infer<typeof testsPromptEntrySchema>;
 
 export class TestsPromptCatalog {
-  private constructor(private readonly data: TestsPromptCatalogData) {}
+  private constructor(private readonly agentTemplate: string) {}
 
   static default(): TestsPromptCatalog {
-    return new TestsPromptCatalog(testsPromptCatalogSchema.parse(promptData));
+    const parsed = testsPromptCatalogSchema.parse(promptData);
+    return new TestsPromptCatalog(this.createTemplate(parsed.agent));
+  }
+
+  static fromTemplate(agentTemplate: string): TestsPromptCatalog {
+    return new TestsPromptCatalog(agentTemplate);
+  }
+
+  static defaultTemplate(): string {
+    const parsed = testsPromptCatalogSchema.parse(promptData);
+    return this.createTemplate(parsed.agent);
   }
 
   getAgentSystemPrompt(languageContext: string): string {
-    return this.formatEntry(this.data.agent, languageContext);
+    return this.agentTemplate.replace(LANGUAGE_CONTEXT_PLACEHOLDER, languageContext);
   }
 
-  private formatEntry(entry: TestsPromptEntry, languageContext: string): string {
+  private static createTemplate(entry: TestsPromptEntry): string {
     const sections = [
       entry.role,
-      languageContext,
+      LANGUAGE_CONTEXT_PLACEHOLDER,
       this.formatInstructions(entry.instructions),
     ];
 
@@ -45,14 +56,14 @@ export class TestsPromptCatalog {
     return sections.join("\n\n");
   }
 
-  private formatInstructions(instructions: string[]): string {
+  private static formatInstructions(instructions: string[]): string {
     return [
       "Instrucoes:",
       ...instructions.map((instruction) => `- ${instruction}`),
     ].join("\n");
   }
 
-  private formatExamples(examples: TestsPromptEntry["examples"]): string {
+  private static formatExamples(examples: TestsPromptEntry["examples"]): string {
     return [
       "Exemplos:",
       ...examples.map((example) => [

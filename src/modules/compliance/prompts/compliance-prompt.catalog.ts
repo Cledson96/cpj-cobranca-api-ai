@@ -1,6 +1,8 @@
 import { z } from "zod";
 import promptData from "./compliance-prompts.json";
 
+const LANGUAGE_CONTEXT_PLACEHOLDER = "{{language_context}}";
+
 const compliancePromptExampleSchema = z.object({
   title: z.string().trim().min(1),
   input: z.string().trim().min(1),
@@ -17,24 +19,33 @@ const compliancePromptCatalogSchema = z.object({
   agent: compliancePromptEntrySchema,
 });
 
-type CompliancePromptCatalogData = z.infer<typeof compliancePromptCatalogSchema>;
 type CompliancePromptEntry = z.infer<typeof compliancePromptEntrySchema>;
 
 export class CompliancePromptCatalog {
-  private constructor(private readonly data: CompliancePromptCatalogData) {}
+  private constructor(private readonly agentTemplate: string) {}
 
   static default(): CompliancePromptCatalog {
-    return new CompliancePromptCatalog(compliancePromptCatalogSchema.parse(promptData));
+    const parsed = compliancePromptCatalogSchema.parse(promptData);
+    return new CompliancePromptCatalog(this.createTemplate(parsed.agent));
+  }
+
+  static fromTemplate(agentTemplate: string): CompliancePromptCatalog {
+    return new CompliancePromptCatalog(agentTemplate);
+  }
+
+  static defaultTemplate(): string {
+    const parsed = compliancePromptCatalogSchema.parse(promptData);
+    return this.createTemplate(parsed.agent);
   }
 
   getAgentSystemPrompt(languageContext: string): string {
-    return this.formatEntry(this.data.agent, languageContext);
+    return this.agentTemplate.replace(LANGUAGE_CONTEXT_PLACEHOLDER, languageContext);
   }
 
-  private formatEntry(entry: CompliancePromptEntry, languageContext: string): string {
+  private static createTemplate(entry: CompliancePromptEntry): string {
     const sections = [
       entry.role,
-      languageContext,
+      LANGUAGE_CONTEXT_PLACEHOLDER,
       this.formatInstructions(entry.instructions),
     ];
 
@@ -45,14 +56,14 @@ export class CompliancePromptCatalog {
     return sections.join("\n\n");
   }
 
-  private formatInstructions(instructions: string[]): string {
+  private static formatInstructions(instructions: string[]): string {
     return [
       "Instrucoes:",
       ...instructions.map((instruction) => `- ${instruction}`),
     ].join("\n");
   }
 
-  private formatExamples(examples: CompliancePromptEntry["examples"]): string {
+  private static formatExamples(examples: CompliancePromptEntry["examples"]): string {
     return [
       "Exemplos:",
       ...examples.map((example) => [

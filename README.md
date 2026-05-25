@@ -9,6 +9,7 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 - **Documentação técnica ou operacional** gerada a partir de código via fluxo `document`
 - **Geração de testes** via fluxo `tests`, com casos classificados e arquivo de teste
 - **Execução em lote** via fluxo `batch`, orquestrando `review`, `compliance`, `document` e `tests`
+- **Gestão de prompts no banco** — cadastro, consulta, ativação e override por versão via `prompt_version`
 - **Grafos LangGraph** — orquestração de agentes especialistas (segurança, complexidade, resource leak, error handling, naming/clarity) com agregador final
 - **Ferramentas determinísticas** — análise estática complementar (regex patterns, lint-like checks)
 - **Histórico de execuções** — persistência em PostgreSQL via Prisma com steps e telemetria
@@ -20,7 +21,7 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 
 ## Estado Atual
 
-Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementados com endpoint HTTP, Docker Compose e documentacao OpenAPI. Os fluxos individuais possuem cache por hash, webhook opcional, historico persistido e telemetria do OpenRouter. O fluxo `review` tambem possui streaming SSE, e o `batch` executa os fluxos prontos em sequencia com resumo persistido e metadados por item.
+Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementados com endpoint HTTP, Docker Compose e documentacao OpenAPI. Os fluxos individuais possuem cache por hash, webhook opcional, historico persistido e telemetria do OpenRouter. O fluxo `review` tambem possui streaming SSE, o `batch` executa os fluxos prontos em sequencia com resumo persistido e metadados por item, e os prompts ativos passam a ser resolvidos de tabelas versionadas no PostgreSQL.
 
 ## Stack
 
@@ -102,6 +103,11 @@ docker compose logs -f api
 | POST   | `/api/v1/batch`    | Executa varios fluxos em sequencia     |
 | GET    | `/api/v1/history`   | Lista últimas execuções            |
 | GET    | `/api/v1/history/:id` | Detalhes de uma execução         |
+| GET    | `/api/v1/prompts` | Lista versoes de prompt por fluxo |
+| GET    | `/api/v1/prompts/:flowType/active` | Busca a versao ativa do fluxo |
+| GET    | `/api/v1/prompts/:flowType/:version` | Busca uma versao especifica |
+| POST   | `/api/v1/prompts` | Cadastra nova versao de prompt |
+| POST   | `/api/v1/prompts/:flowType/:version/activate` | Ativa uma versao de prompt |
 | GET    | `/docs`             | Swagger UI (OpenAPI)               |
 
 ### POST /api/v1/review
@@ -110,7 +116,8 @@ docker compose logs -f api
 {
   "code": "function sum(a, b) { return a + b; }",
   "language": "typescript",
-  "context": "Descrição opcional do contexto"
+  "context": "Descrição opcional do contexto",
+  "prompt_version": 2
 }
 ```
 
@@ -126,7 +133,8 @@ Usa o mesmo payload do `/api/v1/review` e responde como `text/event-stream`, emi
 {
   "task_description": "Permitir renegociacao apenas para contratos ativos e registrar auditoria.",
   "code": "if (contract.active) { renegotiate(contract); audit(contract.id); }",
-  "language": "typescript"
+  "language": "typescript",
+  "prompt_version": 3
 }
 ```
 
@@ -149,7 +157,8 @@ Resposta:
 {
   "code": "export function charge(amount: number) { return amount > 0; }",
   "language": "typescript",
-  "doc_type": "technical"
+  "doc_type": "technical",
+  "prompt_version": 2
 }
 ```
 
@@ -186,7 +195,8 @@ Resposta:
 {
   "code": "export function charge(amount: number) { return amount > 0; }",
   "language": "typescript",
-  "test_framework": "vitest"
+  "test_framework": "vitest",
+  "prompt_version": 5
 }
 ```
 
@@ -233,6 +243,33 @@ Executa itens de `review`, `compliance`, `document` e `tests` em sequencia. Use 
     }
   ]
 }
+```
+
+Cada `payload` de item tambem pode informar `prompt_version` para sobrescrever o prompt ativo apenas naquela execucao.
+
+### Prompt versioning
+
+Prompts ficam na tabela `PromptVersion`, agrupados por `flowType` + `version`. O fluxo usa a versao ativa por padrao, mas qualquer request individual pode informar `prompt_version` para forcar uma versao especifica.
+
+Exemplo de cadastro:
+
+```json
+{
+  "flow_type": "document",
+  "name": "Document v2",
+  "blocks": [
+    {
+      "block_key": "agent",
+      "system_prompt": "Voce gera documentacao tecnica usando o contexto {{language_context}}."
+    }
+  ]
+}
+```
+
+Exemplo de ativacao:
+
+```http
+POST /api/v1/prompts/document/2/activate
 ```
 
 Resposta:

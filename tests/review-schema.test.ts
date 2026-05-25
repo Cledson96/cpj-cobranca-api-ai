@@ -12,12 +12,14 @@ describe("review schemas", () => {
       code: "export function soma(a: number, b: number) { return a + b; }",
       language: "typescript",
       context: "Modulo de calculo simples",
+      prompt_version: 2,
     });
 
     expect(result).toEqual({
       code: "export function soma(a: number, b: number) { return a + b; }",
       language: "typescript",
       context: "Modulo de calculo simples",
+      prompt_version: 2,
     });
   });
 

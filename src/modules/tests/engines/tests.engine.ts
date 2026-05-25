@@ -19,11 +19,13 @@ import type {
 import { testsResponseSchema, type AppEnv, type TestsRequest, type TestsResponse } from "@shared";
 import { createPayloadHash, loadEnv } from "@shared";
 import { TestsFlowGraph, type TestsGraphRunner, type TestsStepRecorder } from "../graphs";
+import { TestsPromptCatalog } from "../prompts";
 import {
   HttpTestsWebhookNotifier,
   type TestsWebhookNotifier,
   type TestsWebhookPayload,
 } from "./tests-webhook.notifier";
+import { LegacyPromptRuntimeResolver, type PromptRuntimeResolver } from "@/modules/prompts";
 
 export interface TestsExecutionPersistence extends TestsStepRecorder {
   createPending(input: CreatePendingExecutionInput<TestsRequest>): Promise<ReviewExecutionRecord>;
@@ -42,6 +44,7 @@ export class TestsEngine extends BaseAgentEngine<TestsRequest, TestsResponse> {
     private readonly persistence?: TestsExecutionPersistence,
     private readonly telemetrySource?: AgentExecutionTelemetrySource,
     private readonly webhookNotifier?: TestsWebhookNotifier,
+    private readonly promptResolver: PromptRuntimeResolver = new LegacyPromptRuntimeResolver(),
   ) {
     super("tests");
   }
@@ -49,6 +52,7 @@ export class TestsEngine extends BaseAgentEngine<TestsRequest, TestsResponse> {
   static createDefault(input: {
     env?: AppEnv;
     persistence?: TestsExecutionPersistence;
+    promptResolver?: PromptRuntimeResolver;
   } = {}): TestsEngine {
     const env = input.env ?? loadEnv();
     const chatModel = new OpenRouterChatFactory(env).create();
@@ -66,12 +70,16 @@ export class TestsEngine extends BaseAgentEngine<TestsRequest, TestsResponse> {
       env.WEBHOOK_CALLBACK_URL
         ? new HttpTestsWebhookNotifier(env.WEBHOOK_CALLBACK_URL)
         : undefined,
+      input.promptResolver ?? new LegacyPromptRuntimeResolver(),
     );
   }
 
   protected async invoke(input: TestsRequest): Promise<TestsResponse> {
+    const promptSet = await this.promptResolver.resolveTests(input.prompt_version);
+    const promptCatalog = TestsPromptCatalog.fromTemplate(promptSet.agent);
+
     if (!this.persistence) {
-      return this.graph.invoke(input);
+      return this.graph.invoke(input, { promptCatalog });
     }
 
     const startedAt = dayjs().valueOf();
@@ -135,6 +143,7 @@ export class TestsEngine extends BaseAgentEngine<TestsRequest, TestsResponse> {
       const output = await this.graph.invoke(input, {
         executionId: execution.id,
         stepRecorder: this.persistence,
+        promptCatalog,
       });
       await this.persistence.markSuccess({
         id: execution.id,

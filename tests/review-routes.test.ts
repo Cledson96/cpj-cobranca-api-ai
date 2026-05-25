@@ -7,6 +7,7 @@ const validPayload: ReviewRequest = {
   code: "export function soma(a: number, b: number) { return a + b; }",
   language: "typescript",
   context: "Modulo simples",
+  prompt_version: 2,
 };
 
 const reviewResponse: ReviewResponse = {

@@ -7,6 +7,7 @@ import { ComplianceRoutes, type ComplianceRoutesDependencies } from "@/modules/c
 import { DocumentRoutes, type DocumentRoutesDependencies } from "@/modules/document";
 import { HealthRoutes } from "@/modules/health/routes";
 import { HistoryRoutes, type HistoryRoutesDependencies } from "@/modules/history";
+import { PromptsRoutes, type PromptsRoutesDependencies } from "@/modules/prompts";
 import { ReviewRoutes, type ReviewRoutesDependencies } from "@/modules/review";
 import { TestsRoutes, type TestsRoutesDependencies } from "@/modules/tests";
 import { type AppEnv, loadEnv } from "@shared";
@@ -21,7 +22,8 @@ export type AppDependencies = BatchRoutesDependencies &
   DocumentRoutesDependencies &
   ReviewRoutesDependencies &
   TestsRoutesDependencies &
-  HistoryRoutesDependencies;
+  HistoryRoutesDependencies &
+  PromptsRoutesDependencies;
 
 export type AppOptions = {
   dependencies?: AppDependencies;
@@ -75,6 +77,7 @@ export class App {
     new TestsRoutes(dependencies).register(this.app);
     new BatchRoutes(dependencies).register(this.app);
     new HistoryRoutes(dependencies).register(this.app);
+    new PromptsRoutes(dependencies).register(this.app);
   }
 
   private registerPlugins(): void {

@@ -11,9 +11,11 @@ describe("document schemas", () => {
       code: "export function charge(amount: number) { return amount > 0; }",
       language: "typescript",
       doc_type: "technical",
+      prompt_version: 2,
     });
 
     expect(result.doc_type).toBe("technical");
+    expect(result.prompt_version).toBe(2);
   });
 
   it("aceita documentacao operacional para squads e produto", () => {

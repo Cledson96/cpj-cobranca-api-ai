@@ -32,7 +32,7 @@ export abstract class ReviewSpecialistAgent extends BaseSpecialistAgent<
   }
 
   protected buildSystemPrompt(context: ReviewAnalysisContext): string {
-    return this.promptCatalog.getSpecialistSystemPrompt(
+    return (context.promptCatalog ?? this.promptCatalog).getSpecialistSystemPrompt(
       this.promptKey,
       context.languageProfile.toPromptContext(),
     );

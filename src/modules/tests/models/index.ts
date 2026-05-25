@@ -1,4 +1,5 @@
 import type { TestsRequest, TestsResponse } from "@shared";
+import type { TestsPromptCatalog } from "@/modules/tests/prompts";
 
 export type TestsBehaviorCandidate = {
   name: string;
@@ -22,6 +23,7 @@ export type TestsToolResult = {
 export type TestsAnalysisContext = {
   input: TestsRequest;
   toolResult: TestsToolResult;
+  promptCatalog?: TestsPromptCatalog;
 };
 
 export interface TestsAgentLike {

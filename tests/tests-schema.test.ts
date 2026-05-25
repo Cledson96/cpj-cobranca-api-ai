@@ -11,9 +11,11 @@ describe("tests schemas", () => {
       code: "export function charge(amount: number) { return amount > 0; }",
       language: "typescript",
       test_framework: "vitest",
+      prompt_version: 5,
     });
 
     expect(result.test_framework).toBe("vitest");
+    expect(result.prompt_version).toBe(5);
   });
 
   it("aceita frameworks citados no case", () => {

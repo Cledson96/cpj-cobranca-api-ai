@@ -19,11 +19,13 @@ import type {
 import { documentResponseSchema, type AppEnv, type DocumentRequest, type DocumentResponse } from "@shared";
 import { createPayloadHash, loadEnv } from "@shared";
 import { DocumentFlowGraph, type DocumentGraphRunner, type DocumentStepRecorder } from "../graphs";
+import { DocumentPromptCatalog } from "../prompts";
 import {
   HttpDocumentWebhookNotifier,
   type DocumentWebhookNotifier,
   type DocumentWebhookPayload,
 } from "./document-webhook.notifier";
+import { LegacyPromptRuntimeResolver, type PromptRuntimeResolver } from "@/modules/prompts";
 
 export interface DocumentExecutionPersistence extends DocumentStepRecorder {
   createPending(input: CreatePendingExecutionInput<DocumentRequest>): Promise<ReviewExecutionRecord>;
@@ -42,6 +44,7 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
     private readonly persistence?: DocumentExecutionPersistence,
     private readonly telemetrySource?: AgentExecutionTelemetrySource,
     private readonly webhookNotifier?: DocumentWebhookNotifier,
+    private readonly promptResolver: PromptRuntimeResolver = new LegacyPromptRuntimeResolver(),
   ) {
     super("document");
   }
@@ -49,6 +52,7 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
   static createDefault(input: {
     env?: AppEnv;
     persistence?: DocumentExecutionPersistence;
+    promptResolver?: PromptRuntimeResolver;
   } = {}): DocumentEngine {
     const env = input.env ?? loadEnv();
     const chatModel = new OpenRouterChatFactory(env).create();
@@ -66,12 +70,16 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
       env.WEBHOOK_CALLBACK_URL
         ? new HttpDocumentWebhookNotifier(env.WEBHOOK_CALLBACK_URL)
         : undefined,
+      input.promptResolver ?? new LegacyPromptRuntimeResolver(),
     );
   }
 
   protected async invoke(input: DocumentRequest): Promise<DocumentResponse> {
+    const promptSet = await this.promptResolver.resolveDocument(input.prompt_version);
+    const promptCatalog = DocumentPromptCatalog.fromTemplate(promptSet.agent);
+
     if (!this.persistence) {
-      return this.graph.invoke(input);
+      return this.graph.invoke(input, { promptCatalog });
     }
 
     const startedAt = dayjs().valueOf();
@@ -135,6 +143,7 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
       const output = await this.graph.invoke(input, {
         executionId: execution.id,
         stepRecorder: this.persistence,
+        promptCatalog,
       });
       await this.persistence.markSuccess({
         id: execution.id,

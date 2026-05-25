@@ -18,7 +18,7 @@ export class ReviewAggregatorAgent extends BaseSpecialistAgent<ReviewResponse, R
   }
 
   protected buildSystemPrompt(context: ReviewAnalysisContext): string {
-    return this.promptCatalog.getAggregatorSystemPrompt(
+    return (context.promptCatalog ?? this.promptCatalog).getAggregatorSystemPrompt(
       context.languageProfile.toPromptContext(),
     );
   }

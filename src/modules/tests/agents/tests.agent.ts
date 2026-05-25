@@ -22,7 +22,7 @@ export class TestsAgent extends BaseSpecialistAgent<TestsResponse, TestsAnalysis
   }
 
   protected buildSystemPrompt(context: TestsAnalysisContext): string {
-    return this.promptCatalog.getAgentSystemPrompt([
+    return (context.promptCatalog ?? this.promptCatalog).getAgentSystemPrompt([
       `Linguagem: ${context.input.language}`,
       `Framework: ${context.input.test_framework}`,
     ].join("\n"));

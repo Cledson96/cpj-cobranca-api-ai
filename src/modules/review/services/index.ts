@@ -9,6 +9,7 @@ import type {
   RecordReviewExecutionStepInput,
   ReviewExecutionRecord,
 } from "@/modules/executions/models";
+import type { PromptRuntimeResolver } from "@/modules/prompts";
 
 export type StartedEventData = {
   execution_id: string;
@@ -48,6 +49,7 @@ export interface ReviewService {
 export type DefaultReviewServiceDependencies = {
   reviewEngine?: ReviewEngine;
   executionPersistence?: ReviewExecutionPersistence;
+  promptResolver?: PromptRuntimeResolver;
 };
 
 export class DummyPersistence implements ReviewExecutionPersistence {
@@ -204,15 +206,18 @@ export class StreamingReviewExecutionPersistence implements ReviewExecutionPersi
 export class DefaultReviewService implements ReviewService {
   private reviewEngine?: ReviewEngine;
   private readonly executionPersistence?: ReviewExecutionPersistence;
+  private readonly promptResolver?: PromptRuntimeResolver;
 
   constructor(dependencies: DefaultReviewServiceDependencies = {}) {
     this.reviewEngine = dependencies.reviewEngine;
     this.executionPersistence = dependencies.executionPersistence;
+    this.promptResolver = dependencies.promptResolver;
   }
 
   async execute(input: ReviewRequest): Promise<ReviewResponse> {
     const engine = this.reviewEngine ?? ReviewEngine.createDefault({
       persistence: this.executionPersistence,
+      promptResolver: this.promptResolver,
     });
     return engine.execute(input);
   }
@@ -247,9 +252,11 @@ export class DefaultReviewService implements ReviewService {
           streamingPersistence,
           currentEngine.getTelemetrySource(),
           currentEngine.getWebhookNotifier(),
+          currentEngine.getPromptResolver(),
         )
       : ReviewEngine.createDefault({
           persistence: streamingPersistence,
+          promptResolver: this.promptResolver,
         });
 
     return engine.execute(input);

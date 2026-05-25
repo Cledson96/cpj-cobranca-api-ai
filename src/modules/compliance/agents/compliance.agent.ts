@@ -18,7 +18,9 @@ export class ComplianceAgent extends BaseSpecialistAgent<ComplianceResponse, Com
   }
 
   protected buildSystemPrompt(context: ComplianceAnalysisContext): string {
-    return this.promptCatalog.getAgentSystemPrompt(`Linguagem: ${context.input.language}`);
+    return (context.promptCatalog ?? this.promptCatalog).getAgentSystemPrompt(
+      `Linguagem: ${context.input.language}`,
+    );
   }
 
   protected buildUserPrompt(context: ComplianceAnalysisContext): string {

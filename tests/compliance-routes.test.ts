@@ -7,6 +7,7 @@ const validPayload: ComplianceRequest = {
   task_description: "Permitir renegociacao apenas para contratos ativos e registrar auditoria.",
   code: "if (contract.active) { renegotiate(contract); audit(contract.id); }",
   language: "typescript",
+  prompt_version: 3,
 };
 
 const complianceResponse: ComplianceResponse = {

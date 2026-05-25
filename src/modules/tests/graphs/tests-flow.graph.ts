@@ -12,6 +12,7 @@ import type {
 import { TestsAgent } from "@/modules/tests/agents";
 import { DeterministicTestsToolsRunner } from "@/modules/tests/tools";
 import type { StructuredOutputRunner } from "@/modules/agent";
+import type { TestsPromptCatalog } from "@/modules/tests/prompts";
 
 export type TestsStepRecorder = {
   recordStep(input: RecordReviewExecutionStepInput): Promise<void>;
@@ -20,6 +21,7 @@ export type TestsStepRecorder = {
 export type TestsGraphRunContext = {
   executionId?: string;
   stepRecorder?: TestsStepRecorder;
+  promptCatalog?: TestsPromptCatalog;
 };
 
 export interface TestsGraphRunner {
@@ -34,6 +36,7 @@ export type TestsFlowGraphDependencies = {
 const TestsFlowAnnotation = Annotation.Root({
   input: Annotation<TestsRequest>,
   executionId: Annotation<string | undefined>,
+  promptCatalog: Annotation<TestsPromptCatalog | undefined>,
   toolResult: Annotation<TestsToolResult | undefined>,
   output: Annotation<TestsResponse | undefined>,
 });
@@ -62,6 +65,7 @@ export class TestsFlowGraph implements TestsGraphRunner {
       {
         input,
         executionId: context.executionId,
+        promptCatalog: context.promptCatalog,
       },
       {
         configurable: {
@@ -155,6 +159,7 @@ export class TestsFlowGraph implements TestsGraphRunner {
     return {
       input: state.input,
       toolResult: state.toolResult,
+      promptCatalog: state.promptCatalog,
     };
   }
 

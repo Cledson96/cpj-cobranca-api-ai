@@ -7,6 +7,7 @@ const validPayload: TestsRequest = {
   code: "export function charge(amount: number) { return amount > 0; }",
   language: "typescript",
   test_framework: "vitest",
+  prompt_version: 5,
 };
 
 const testsResponse: TestsResponse = {

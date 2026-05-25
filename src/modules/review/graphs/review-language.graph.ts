@@ -27,6 +27,7 @@ export type ReviewLanguageGraphContext = {
   languageProfile: LanguageProfile;
   executionId?: string;
   stepRecorder?: ReviewStepRecorder;
+  promptCatalog?: ReviewPromptCatalog;
 };
 
 export interface ReviewLanguageGraph {
@@ -48,6 +49,7 @@ const ReviewLanguageAnnotation = Annotation.Root({
   input: Annotation<ReviewRequest>,
   languageProfile: Annotation<LanguageProfile>,
   executionId: Annotation<string | undefined>,
+  promptCatalog: Annotation<ReviewPromptCatalog | undefined>,
   deterministicFindings: Annotation<ReviewFinding[]>({
     reducer: (_left: ReviewFinding[], right: ReviewFinding[]) => right,
     default: () => [],
@@ -79,6 +81,7 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
         input,
         languageProfile: context.languageProfile,
         executionId: context.executionId,
+        promptCatalog: context.promptCatalog,
       },
       {
         configurable: {
@@ -218,6 +221,7 @@ export abstract class BaseReviewLanguageGraph implements ReviewLanguageGraph {
       languageProfile: state.languageProfile,
       deterministicFindings: state.deterministicFindings,
       agentOutputs: state.agentOutputs,
+      promptCatalog: state.promptCatalog,
     };
   }
 
@@ -310,16 +314,17 @@ function getErrorMessage(error: unknown): string | null {
 
 export function createReviewLanguageGraphAgents(
   runner: ConstructorParameters<typeof NamingClarityAgent>[0],
+  promptCatalog?: ReviewPromptCatalog,
 ): ReviewLanguageGraphAgents {
-  const promptCatalog = ReviewPromptCatalog.default();
+  const catalog = promptCatalog ?? ReviewPromptCatalog.default();
 
   return {
-    namingClarityAgent: new NamingClarityAgent(runner, promptCatalog),
-    errorHandlingAgent: new ErrorHandlingAgent(runner, promptCatalog),
-    resourceLeakAgent: new ResourceLeakAgent(runner, promptCatalog),
-    complexityAgent: new ComplexityAgent(runner, promptCatalog),
-    securityAgent: new SecurityAgent(runner, promptCatalog),
-    reviewAggregatorAgent: new ReviewAggregatorAgent(runner, promptCatalog),
+    namingClarityAgent: new NamingClarityAgent(runner, catalog),
+    errorHandlingAgent: new ErrorHandlingAgent(runner, catalog),
+    resourceLeakAgent: new ResourceLeakAgent(runner, catalog),
+    complexityAgent: new ComplexityAgent(runner, catalog),
+    securityAgent: new SecurityAgent(runner, catalog),
+    reviewAggregatorAgent: new ReviewAggregatorAgent(runner, catalog),
     toolsRunner: new DeterministicReviewToolsRunner(),
   };
 }

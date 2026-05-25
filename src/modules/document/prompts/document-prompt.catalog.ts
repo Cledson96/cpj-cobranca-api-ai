@@ -1,6 +1,8 @@
 import { z } from "zod";
 import promptData from "./document-prompts.json";
 
+const LANGUAGE_CONTEXT_PLACEHOLDER = "{{language_context}}";
+
 const documentPromptExampleSchema = z.object({
   title: z.string().trim().min(1),
   input: z.string().trim().min(1),
@@ -17,24 +19,33 @@ const documentPromptCatalogSchema = z.object({
   agent: documentPromptEntrySchema,
 });
 
-type DocumentPromptCatalogData = z.infer<typeof documentPromptCatalogSchema>;
 type DocumentPromptEntry = z.infer<typeof documentPromptEntrySchema>;
 
 export class DocumentPromptCatalog {
-  private constructor(private readonly data: DocumentPromptCatalogData) {}
+  private constructor(private readonly agentTemplate: string) {}
 
   static default(): DocumentPromptCatalog {
-    return new DocumentPromptCatalog(documentPromptCatalogSchema.parse(promptData));
+    const parsed = documentPromptCatalogSchema.parse(promptData);
+    return new DocumentPromptCatalog(this.createTemplate(parsed.agent));
+  }
+
+  static fromTemplate(agentTemplate: string): DocumentPromptCatalog {
+    return new DocumentPromptCatalog(agentTemplate);
+  }
+
+  static defaultTemplate(): string {
+    const parsed = documentPromptCatalogSchema.parse(promptData);
+    return this.createTemplate(parsed.agent);
   }
 
   getAgentSystemPrompt(languageContext: string): string {
-    return this.formatEntry(this.data.agent, languageContext);
+    return this.agentTemplate.replace(LANGUAGE_CONTEXT_PLACEHOLDER, languageContext);
   }
 
-  private formatEntry(entry: DocumentPromptEntry, languageContext: string): string {
+  private static createTemplate(entry: DocumentPromptEntry): string {
     const sections = [
       entry.role,
-      languageContext,
+      LANGUAGE_CONTEXT_PLACEHOLDER,
       this.formatInstructions(entry.instructions),
     ];
 
@@ -45,14 +56,14 @@ export class DocumentPromptCatalog {
     return sections.join("\n\n");
   }
 
-  private formatInstructions(instructions: string[]): string {
+  private static formatInstructions(instructions: string[]): string {
     return [
       "Instrucoes:",
       ...instructions.map((instruction) => `- ${instruction}`),
     ].join("\n");
   }
 
-  private formatExamples(examples: DocumentPromptEntry["examples"]): string {
+  private static formatExamples(examples: DocumentPromptEntry["examples"]): string {
     return [
       "Exemplos:",
       ...examples.map((example) => [

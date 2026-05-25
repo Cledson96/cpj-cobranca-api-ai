@@ -1,6 +1,7 @@
 import { createPayloadHash, type TestsRequest, type TestsResponse } from "@shared";
 import { TestsEngine, type TestsExecutionPersistence } from "@/modules/tests/engines";
 import type { FlowExecutionMetadata, ReviewExecutionRecord } from "@/modules/executions";
+import type { PromptRuntimeResolver } from "@/modules/prompts";
 
 export interface TestsService {
   execute(input: TestsRequest): Promise<TestsResponse>;
@@ -14,20 +15,24 @@ export type TestsEngineLike = {
 export type DefaultTestsServiceDependencies = {
   testsEngine?: TestsEngineLike;
   executionPersistence?: TestsExecutionPersistence;
+  promptResolver?: PromptRuntimeResolver;
 };
 
 export class DefaultTestsService implements TestsService {
   private readonly testsEngine?: TestsEngineLike;
   private readonly executionPersistence?: TestsExecutionPersistence;
+  private readonly promptResolver?: PromptRuntimeResolver;
 
   constructor(dependencies: DefaultTestsServiceDependencies = {}) {
     this.testsEngine = dependencies.testsEngine;
     this.executionPersistence = dependencies.executionPersistence;
+    this.promptResolver = dependencies.promptResolver;
   }
 
   async execute(input: TestsRequest): Promise<TestsResponse> {
     const engine = this.testsEngine ?? TestsEngine.createDefault({
       persistence: this.executionPersistence,
+      promptResolver: this.promptResolver,
     });
 
     return engine.execute(input);

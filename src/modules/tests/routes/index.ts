@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { AgentExecutionRepository } from "@/modules/executions";
+import { DefaultPromptsService, PrismaPromptVersionRepository, type PromptRuntimeResolver } from "@/modules/prompts";
 import { TestsController } from "@/modules/tests/controllers";
 import { testsRouteDocs } from "@/modules/tests/docs";
 import { DefaultTestsService, type TestsService } from "@/modules/tests/services";
@@ -7,6 +8,7 @@ import type { TestsRequest, TestsResponse } from "@shared";
 
 export type TestsRoutesDependencies = {
   testsService?: TestsService;
+  promptResolver?: PromptRuntimeResolver;
 };
 
 export class TestsRoutes {
@@ -35,11 +37,15 @@ export class TestsRoutes {
     }
 
     if ("prisma" in app) {
+      const promptResolver = this.dependencies.promptResolver
+        ?? new DefaultPromptsService(new PrismaPromptVersionRepository(app.prisma));
+
       return new DefaultTestsService({
         executionPersistence: new AgentExecutionRepository<TestsRequest, TestsResponse>(
           app.prisma,
           "tests",
         ),
+        promptResolver,
       });
     }
 

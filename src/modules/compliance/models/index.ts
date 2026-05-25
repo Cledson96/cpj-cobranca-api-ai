@@ -1,4 +1,5 @@
 import type { ComplianceRequest, ComplianceResponse } from "@shared";
+import type { CompliancePromptCatalog } from "@/modules/compliance/prompts";
 
 export type ComplianceRequirementCandidate = {
   text: string;
@@ -20,6 +21,7 @@ export type ComplianceToolResult = {
 export type ComplianceAnalysisContext = {
   input: ComplianceRequest;
   toolResult: ComplianceToolResult;
+  promptCatalog?: CompliancePromptCatalog;
 };
 
 export interface ComplianceAgentLike {

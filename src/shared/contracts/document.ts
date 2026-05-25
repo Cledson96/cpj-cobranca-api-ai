@@ -10,6 +10,7 @@ export const documentRequestSchema = z.object({
   code: nonEmptyString(),
   language: supportedLanguageSchema,
   doc_type: documentDocTypeSchema,
+  prompt_version: z.number().int().min(1).optional(),
 });
 export type DocumentRequest = z.infer<typeof documentRequestSchema>;
 

@@ -12,6 +12,7 @@ import type {
 import { ComplianceAgent } from "@/modules/compliance/agents";
 import { DeterministicComplianceToolsRunner } from "@/modules/compliance/tools";
 import type { StructuredOutputRunner } from "@/modules/agent";
+import type { CompliancePromptCatalog } from "@/modules/compliance/prompts";
 
 export type ComplianceStepRecorder = {
   recordStep(input: RecordReviewExecutionStepInput): Promise<void>;
@@ -20,6 +21,7 @@ export type ComplianceStepRecorder = {
 export type ComplianceGraphRunContext = {
   executionId?: string;
   stepRecorder?: ComplianceStepRecorder;
+  promptCatalog?: CompliancePromptCatalog;
 };
 
 export interface ComplianceGraphRunner {
@@ -34,6 +36,7 @@ export type ComplianceFlowGraphDependencies = {
 const ComplianceFlowAnnotation = Annotation.Root({
   input: Annotation<ComplianceRequest>,
   executionId: Annotation<string | undefined>,
+  promptCatalog: Annotation<CompliancePromptCatalog | undefined>,
   toolResult: Annotation<ComplianceToolResult | undefined>,
   output: Annotation<ComplianceResponse | undefined>,
 });
@@ -62,6 +65,7 @@ export class ComplianceFlowGraph implements ComplianceGraphRunner {
       {
         input,
         executionId: context.executionId,
+        promptCatalog: context.promptCatalog,
       },
       {
         configurable: {
@@ -155,6 +159,7 @@ export class ComplianceFlowGraph implements ComplianceGraphRunner {
     return {
       input: state.input,
       toolResult: state.toolResult,
+      promptCatalog: state.promptCatalog,
     };
   }
 
