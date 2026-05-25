@@ -1,4 +1,4 @@
-import { toSaoPauloIso } from "@shared";
+import { toSaoPauloIso, type ReviewRequest } from "@shared";
 import type {
   CreatePendingReviewExecutionInput,
   MarkReviewExecutionFailedInput,
@@ -130,6 +130,41 @@ export class ReviewExecutionRepository {
     });
 
     return executions.map(mapReviewExecutionListItem);
+  }
+
+  async findSuccessByHash(requestHash: string): Promise<ReviewExecutionRecord | null> {
+    const executions = await this.prisma.execution.findMany({
+      where: {
+        flowType: "review",
+        status: "success",
+        requestHash,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    });
+
+    return executions[0] ?? null;
+  }
+
+  async createCacheHit(input: {
+    inputPayload: ReviewRequest;
+    requestHash: string;
+    sourceExecutionId: string;
+    outputPayload: unknown;
+    durationMs: number;
+  }): Promise<ReviewExecutionRecord> {
+    return this.prisma.execution.create({
+      data: {
+        flowType: "review",
+        status: "success",
+        inputPayload: input.inputPayload as any,
+        outputPayload: input.outputPayload as any,
+        requestHash: input.requestHash,
+        cacheHit: true,
+        sourceExecutionId: input.sourceExecutionId,
+        durationMs: input.durationMs,
+      },
+    });
   }
 }
 

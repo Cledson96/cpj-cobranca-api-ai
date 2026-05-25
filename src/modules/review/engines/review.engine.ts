@@ -33,6 +33,14 @@ export interface ReviewExecutionPersistence extends ReviewStepRecorder {
   markSuccess(input: MarkReviewExecutionSuccessInput): Promise<ReviewExecutionRecord>;
   markFailed(input: MarkReviewExecutionFailedInput): Promise<ReviewExecutionRecord>;
   recordTelemetry(input: RecordReviewExecutionTelemetryInput): Promise<void>;
+  findSuccessByHash(requestHash: string): Promise<ReviewExecutionRecord | null>;
+  createCacheHit(input: {
+    inputPayload: ReviewRequest;
+    requestHash: string;
+    sourceExecutionId: string;
+    outputPayload: ReviewResponse;
+    durationMs: number;
+  }): Promise<ReviewExecutionRecord>;
 }
 
 export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse> {
@@ -78,12 +86,53 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
     }
 
     const startedAt = dayjs().valueOf();
+    const hash = createPayloadHash(input);
+
+    try {
+      const cached = await this.persistence.findSuccessByHash(hash);
+      if (cached && cached.outputPayload) {
+        const durationMs = dayjs().valueOf() - startedAt;
+        const execution = await this.persistence.createCacheHit({
+          inputPayload: input,
+          requestHash: hash,
+          sourceExecutionId: cached.id,
+          outputPayload: cached.outputPayload as ReviewResponse,
+          durationMs,
+        });
+
+        await this.persistence.recordStep({
+          executionId: execution.id,
+          nodeName: "cache_lookup",
+          kind: "cache",
+          status: "success",
+          inputPayload: { requestHash: hash },
+          outputPayload: { cacheHit: true, sourceExecutionId: cached.id },
+          durationMs,
+        });
+
+        return cached.outputPayload as ReviewResponse;
+      }
+    } catch {
+      // Falhas no cache não impedem o fluxo principal
+    }
+
     const execution = await this.persistence.createPending({
       inputPayload: input,
-      requestHash: createPayloadHash(input),
+      requestHash: hash,
     });
 
     try {
+      const lookupDuration = dayjs().valueOf() - startedAt;
+      await this.persistence.recordStep({
+        executionId: execution.id,
+        nodeName: "cache_lookup",
+        kind: "cache",
+        status: "success",
+        inputPayload: { requestHash: hash },
+        outputPayload: { cacheHit: false },
+        durationMs: lookupDuration,
+      });
+
       const output = await this.graph.invoke(input, {
         executionId: execution.id,
         stepRecorder: this.persistence,

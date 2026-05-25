@@ -53,6 +53,37 @@ class FakeReviewExecutionPersistence implements ReviewExecutionPersistence {
   readonly failedInputs: MarkReviewExecutionFailedInput[] = [];
   readonly stepInputs: RecordReviewExecutionStepInput[] = [];
   readonly telemetryInputs: RecordReviewExecutionTelemetryInput[] = [];
+  readonly cacheHitInputs: any[] = [];
+  cachedRecord: ReviewExecutionRecord | null = null;
+
+  async findSuccessByHash(_requestHash: string): Promise<ReviewExecutionRecord | null> {
+    void _requestHash;
+    return this.cachedRecord;
+  }
+
+  async createCacheHit(input: {
+    inputPayload: ReviewRequest;
+    requestHash: string;
+    sourceExecutionId: string;
+    outputPayload: ReviewResponse;
+    durationMs: number;
+  }): Promise<ReviewExecutionRecord> {
+    this.cacheHitInputs.push(input);
+
+    return {
+      id: "execution-cache-1",
+      createdAt: "2026-05-24T12:00:00.000Z",
+      flowType: "review",
+      status: "success",
+      inputPayload: input.inputPayload,
+      outputPayload: input.outputPayload,
+      durationMs: input.durationMs,
+      requestHash: input.requestHash,
+      cacheHit: true,
+      sourceExecutionId: input.sourceExecutionId,
+      errorMessage: null,
+    };
+  }
 
   async createPending(input: CreatePendingReviewExecutionInput): Promise<ReviewExecutionRecord> {
     this.pendingInputs.push(input);
@@ -186,5 +217,46 @@ describe("ReviewEngine com persistencia", () => {
     expect(persistence.failedInputs[0]?.id).toBe("execution-1");
     expect(persistence.failedInputs[0]?.errorMessage).toBe("falha no llm");
     expect(persistence.failedInputs[0]?.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("ignora a execucao do grafo e retorna payload de sucesso em caso de cache hit", async () => {
+    const graph = new FakeReviewGraph();
+    const persistence = new FakeReviewExecutionPersistence();
+
+    persistence.cachedRecord = {
+      id: "execution-original",
+      createdAt: "2026-05-24T12:00:00.000Z",
+      flowType: "review",
+      status: "success",
+      inputPayload: reviewInput,
+      outputPayload: reviewOutput,
+      durationMs: 1200,
+      requestHash: "hash-original",
+      cacheHit: false,
+      sourceExecutionId: null,
+      errorMessage: null,
+    };
+
+    const engine = new ReviewEngine(graph, persistence);
+    const output = await engine.execute(reviewInput);
+
+    expect(output).toEqual(reviewOutput);
+    expect(graph.lastContext).toBeUndefined();
+
+    expect(persistence.cacheHitInputs).toHaveLength(1);
+    expect(persistence.cacheHitInputs[0]?.sourceExecutionId).toBe("execution-original");
+    expect(persistence.cacheHitInputs[0]?.outputPayload).toEqual(reviewOutput);
+
+    const cacheStep = persistence.stepInputs.find((s) => s.nodeName === "cache_lookup");
+    expect(cacheStep).toBeDefined();
+    expect(cacheStep?.kind).toBe("cache");
+    expect(cacheStep?.status).toBe("success");
+    expect(cacheStep?.outputPayload).toEqual({
+      cacheHit: true,
+      sourceExecutionId: "execution-original",
+    });
+
+    expect(persistence.pendingInputs).toHaveLength(0);
+    expect(persistence.successInputs).toHaveLength(0);
   });
 });

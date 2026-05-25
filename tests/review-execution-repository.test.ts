@@ -432,4 +432,79 @@ describe("ReviewExecutionRepository", () => {
       },
     });
   });
+
+  it("busca execucao com sucesso por hash", async () => {
+    const { prisma, repository } = createRepository();
+    prisma.execution.findMany.mockResolvedValue([
+      {
+        id: "execution-1",
+        createdAt,
+        flowType: "review",
+        status: "success",
+        inputPayload: reviewInput,
+        outputPayload: reviewOutput,
+        durationMs: 1200,
+        requestHash: "hash-1",
+        cacheHit: false,
+        sourceExecutionId: null,
+        errorMessage: null,
+      },
+    ]);
+
+    const result = await repository.findSuccessByHash("hash-1");
+
+    expect(result).toBeDefined();
+    expect(result?.id).toBe("execution-1");
+    expect(prisma.execution.findMany).toHaveBeenCalledWith({
+      where: {
+        flowType: "review",
+        status: "success",
+        requestHash: "hash-1",
+      },
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    });
+  });
+
+  it("cria execucao de cache hit com sucesso", async () => {
+    const { prisma, repository } = createRepository();
+    prisma.execution.create.mockResolvedValue({
+      id: "execution-2",
+      createdAt,
+      flowType: "review",
+      status: "success",
+      inputPayload: reviewInput,
+      outputPayload: reviewOutput,
+      durationMs: 5,
+      requestHash: "hash-1",
+      cacheHit: true,
+      sourceExecutionId: "execution-1",
+      errorMessage: null,
+    });
+
+    const execution = await repository.createCacheHit({
+      inputPayload: reviewInput,
+      requestHash: "hash-1",
+      sourceExecutionId: "execution-1",
+      outputPayload: reviewOutput,
+      durationMs: 5,
+    });
+
+    expect(execution.id).toBe("execution-2");
+    expect(execution.cacheHit).toBe(true);
+    expect(execution.sourceExecutionId).toBe("execution-1");
+    expect(prisma.execution.create).toHaveBeenCalledWith({
+      data: {
+        flowType: "review",
+        status: "success",
+        inputPayload: reviewInput,
+        outputPayload: reviewOutput,
+        requestHash: "hash-1",
+        cacheHit: true,
+        sourceExecutionId: "execution-1",
+        durationMs: 5,
+      },
+    });
+  });
 });
+
