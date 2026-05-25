@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
+import { AgentExecutionRepository } from "@/modules/executions";
 import { ComplianceController } from "@/modules/compliance/controllers";
 import { complianceRouteDocs } from "@/modules/compliance/docs";
 import { DefaultComplianceService, type ComplianceService } from "@/modules/compliance/services";
+import type { ComplianceRequest, ComplianceResponse } from "@shared";
 
 export type ComplianceRoutesDependencies = {
   complianceService?: ComplianceService;
@@ -15,7 +17,7 @@ export class ComplianceRoutes {
   }
 
   register(app: FastifyInstance): void {
-    const controller = new ComplianceController(this.createComplianceService());
+    const controller = new ComplianceController(this.createComplianceService(app));
 
     app.post(
       "/api/v1/compliance",
@@ -27,7 +29,20 @@ export class ComplianceRoutes {
     );
   }
 
-  private createComplianceService(): ComplianceService {
-    return this.dependencies.complianceService ?? new DefaultComplianceService();
+  private createComplianceService(app: FastifyInstance): ComplianceService {
+    if (this.dependencies.complianceService) {
+      return this.dependencies.complianceService;
+    }
+
+    if ("prisma" in app) {
+      return new DefaultComplianceService({
+        executionPersistence: new AgentExecutionRepository<ComplianceRequest, ComplianceResponse>(
+          app.prisma,
+          "compliance",
+        ),
+      });
+    }
+
+    return new DefaultComplianceService();
   }
 }

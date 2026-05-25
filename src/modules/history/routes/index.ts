@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { ReviewExecutionRepository } from "@/modules/executions";
+import { ExecutionHistoryRepository } from "@/modules/executions";
 import { HistoryController } from "../controllers";
 import { historyDetailRouteDocs, historyListRouteDocs } from "../docs";
 import { DefaultHistoryService, type HistoryService } from "../services";
@@ -37,7 +37,7 @@ export class HistoryRoutes {
     }
 
     if ("prisma" in app) {
-      return new DefaultHistoryService(new ReviewExecutionRepository(app.prisma));
+      return new DefaultHistoryService(new ExecutionHistoryRepository(app.prisma));
     }
 
     return new DefaultHistoryService();

@@ -9,6 +9,7 @@ import {
 import dayjs from "dayjs";
 import { handleUnknownError } from "@/infrastructure/errors";
 import type {
+  CreateCacheHitExecutionInput,
   CreatePendingExecutionInput,
   MarkExecutionFailedInput,
   MarkExecutionSuccessInput,
@@ -18,12 +19,21 @@ import type {
 import type { AppEnv, ComplianceRequest, ComplianceResponse } from "@shared";
 import { createPayloadHash, loadEnv } from "@shared";
 import { ComplianceFlowGraph, type ComplianceGraphRunner, type ComplianceStepRecorder } from "../graphs";
+import {
+  HttpComplianceWebhookNotifier,
+  type ComplianceWebhookNotifier,
+  type ComplianceWebhookPayload,
+} from "./compliance-webhook.notifier";
 
 export interface ComplianceExecutionPersistence extends ComplianceStepRecorder {
   createPending(input: CreatePendingExecutionInput<ComplianceRequest>): Promise<ReviewExecutionRecord>;
   markSuccess(input: MarkExecutionSuccessInput<ComplianceResponse>): Promise<ReviewExecutionRecord>;
   markFailed(input: MarkExecutionFailedInput): Promise<ReviewExecutionRecord>;
   recordTelemetry(input: RecordReviewExecutionTelemetryInput): Promise<void>;
+  findSuccessByHash(requestHash: string): Promise<ReviewExecutionRecord | null>;
+  createCacheHit(
+    input: CreateCacheHitExecutionInput<ComplianceRequest, ComplianceResponse>,
+  ): Promise<ReviewExecutionRecord>;
 }
 
 export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, ComplianceResponse> {
@@ -31,6 +41,7 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
     private readonly graph: ComplianceGraphRunner,
     private readonly persistence?: ComplianceExecutionPersistence,
     private readonly telemetrySource?: AgentExecutionTelemetrySource,
+    private readonly webhookNotifier?: ComplianceWebhookNotifier,
   ) {
     super("compliance");
   }
@@ -52,6 +63,9 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
       ComplianceFlowGraph.createDefault(structuredOutputRunner),
       input.persistence,
       telemetryCollector,
+      env.WEBHOOK_CALLBACK_URL
+        ? new HttpComplianceWebhookNotifier(env.WEBHOOK_CALLBACK_URL)
+        : undefined,
     );
   }
 
@@ -61,12 +75,60 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
     }
 
     const startedAt = dayjs().valueOf();
+    const hash = createPayloadHash(input);
+
+    try {
+      const cached = await this.persistence.findSuccessByHash(hash);
+      if (cached && cached.outputPayload) {
+        const durationMs = dayjs().valueOf() - startedAt;
+        const execution = await this.persistence.createCacheHit({
+          inputPayload: input,
+          requestHash: hash,
+          sourceExecutionId: cached.id,
+          outputPayload: cached.outputPayload as ComplianceResponse,
+          durationMs,
+        });
+
+        await this.persistence.recordStep({
+          executionId: execution.id,
+          nodeName: "cache_lookup",
+          kind: "cache",
+          status: "success",
+          inputPayload: { requestHash: hash },
+          outputPayload: { cacheHit: true, sourceExecutionId: cached.id },
+          durationMs,
+        });
+
+        await this.notifyWebhook({
+          executionId: execution.id,
+          status: "success",
+          cacheHit: true,
+          output: cached.outputPayload as ComplianceResponse,
+        });
+
+        return cached.outputPayload as ComplianceResponse;
+      }
+    } catch {
+      // Falhas no cache nao impedem o fluxo principal
+    }
+
     const execution = await this.persistence.createPending({
       inputPayload: input,
-      requestHash: createPayloadHash(input),
+      requestHash: hash,
     });
 
     try {
+      const lookupDuration = dayjs().valueOf() - startedAt;
+      await this.persistence.recordStep({
+        executionId: execution.id,
+        nodeName: "cache_lookup",
+        kind: "cache",
+        status: "success",
+        inputPayload: { requestHash: hash },
+        outputPayload: { cacheHit: false },
+        durationMs: lookupDuration,
+      });
+
       const output = await this.graph.invoke(input, {
         executionId: execution.id,
         stepRecorder: this.persistence,
@@ -75,6 +137,12 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
         id: execution.id,
         outputPayload: output,
         durationMs: dayjs().valueOf() - startedAt,
+      });
+      await this.notifyWebhook({
+        executionId: execution.id,
+        status: "success",
+        cacheHit: false,
+        output,
       });
       await this.recordTelemetry(execution.id);
 
@@ -86,6 +154,12 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
         errorMessage: handledError.message,
         durationMs: dayjs().valueOf() - startedAt,
       });
+      await this.notifyWebhook({
+        executionId: execution.id,
+        status: "failed",
+        cacheHit: false,
+        errorMessage: handledError.message,
+      });
       throw handledError;
     }
   }
@@ -96,6 +170,68 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
 
   getTelemetrySource(): AgentExecutionTelemetrySource | undefined {
     return this.telemetrySource;
+  }
+
+  getWebhookNotifier(): ComplianceWebhookNotifier | undefined {
+    return this.webhookNotifier;
+  }
+
+  private async notifyWebhook(input: {
+    executionId: string;
+    status: "success" | "failed";
+    cacheHit: boolean;
+    output?: ComplianceResponse;
+    errorMessage?: string;
+  }): Promise<void> {
+    if (!this.persistence || !this.webhookNotifier) {
+      return;
+    }
+
+    const startedAt = dayjs().valueOf();
+    const payload: ComplianceWebhookPayload = input.status === "success"
+      ? {
+          flow_type: "compliance",
+          execution_id: input.executionId,
+          status: "success",
+          cache_hit: input.cacheHit,
+          output: input.output as ComplianceResponse,
+        }
+      : {
+          flow_type: "compliance",
+          execution_id: input.executionId,
+          status: "failed",
+          cache_hit: false,
+          error_message: input.errorMessage ?? "Erro desconhecido no compliance.",
+        };
+
+    try {
+      await this.webhookNotifier.notify(payload);
+      await this.persistence.recordStep({
+        executionId: input.executionId,
+        nodeName: "webhook_callback",
+        kind: "webhook",
+        status: "success",
+        inputPayload: {
+          status: payload.status,
+          cacheHit: payload.cache_hit,
+        },
+        outputPayload: { delivered: true },
+        durationMs: dayjs().valueOf() - startedAt,
+      });
+    } catch (error) {
+      await this.persistence.recordStep({
+        executionId: input.executionId,
+        nodeName: "webhook_callback",
+        kind: "webhook",
+        status: "failed",
+        inputPayload: {
+          status: payload.status,
+          cacheHit: payload.cache_hit,
+        },
+        durationMs: dayjs().valueOf() - startedAt,
+        errorMessage: getErrorMessage(error),
+      });
+    }
   }
 
   private async recordTelemetry(executionId: string): Promise<void> {
@@ -127,4 +263,12 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
 
 function toNullableUsdString(value: number | null): string | null {
   return value === null ? null : value.toString();
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Erro desconhecido no webhook callback.";
 }

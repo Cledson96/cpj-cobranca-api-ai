@@ -17,7 +17,7 @@ const notFoundResponse = {
 
 export const historyListRouteDocs = {
   summary: "Lista execucoes recentes",
-  description: "Retorna execucoes recentes persistidas do fluxo de review.",
+  description: "Retorna execucoes recentes persistidas dos fluxos do agente.",
   tags: ["History"],
   response: {
     200: {

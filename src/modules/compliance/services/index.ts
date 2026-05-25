@@ -1,20 +1,29 @@
 import type { ComplianceRequest, ComplianceResponse } from "@shared";
+import { ComplianceEngine, type ComplianceExecutionPersistence } from "@/modules/compliance/engines";
 
 export interface ComplianceService {
   execute(input: ComplianceRequest): Promise<ComplianceResponse>;
 }
 
-export class DefaultComplianceService implements ComplianceService {
-  async execute(input: ComplianceRequest): Promise<ComplianceResponse> {
-    void input;
+export type DefaultComplianceServiceDependencies = {
+  complianceEngine?: ComplianceEngine;
+  executionPersistence?: ComplianceExecutionPersistence;
+};
 
-    return {
-      compliant: false,
-      compliance_score: 0,
-      covered_requirements: [],
-      missing_requirements: ["Fluxo compliance ainda nao conectado ao agente real."],
-      partial_requirements: [],
-      verdict: "A rota de compliance esta disponivel com service mockado nesta etapa.",
-    };
+export class DefaultComplianceService implements ComplianceService {
+  private readonly complianceEngine?: ComplianceEngine;
+  private readonly executionPersistence?: ComplianceExecutionPersistence;
+
+  constructor(dependencies: DefaultComplianceServiceDependencies = {}) {
+    this.complianceEngine = dependencies.complianceEngine;
+    this.executionPersistence = dependencies.executionPersistence;
+  }
+
+  async execute(input: ComplianceRequest): Promise<ComplianceResponse> {
+    const engine = this.complianceEngine ?? ComplianceEngine.createDefault({
+      persistence: this.executionPersistence,
+    });
+
+    return engine.execute(input);
   }
 }

@@ -5,6 +5,7 @@ API do case técnico CPJ-Cobrança para revisão automatizada de código usando 
 ## Funcionalidades
 
 - **Revisão de código** multi-linguagem (TypeScript, JavaScript, Python, PHP) usando agentes especialistas paralelos com roteamento por linguagem
+- **Avaliação de aderência** entre tarefa e código implementado via fluxo `compliance`
 - **Grafos LangGraph** — orquestração de agentes especialistas (segurança, complexidade, resource leak, error handling, naming/clarity) com agregador final
 - **Ferramentas determinísticas** — análise estática complementar (regex patterns, lint-like checks)
 - **Histórico de execuções** — persistência em PostgreSQL via Prisma com steps e telemetria
@@ -12,11 +13,11 @@ API do case técnico CPJ-Cobrança para revisão automatizada de código usando 
 - **OpenAPI/Swagger UI** — docs interativos em `/docs`
 - **OpenRouter** — provedor LLM multi-modelo
 - **LangSmith** — tracing opcional (desligado por padrão)
-- **Webhook opcional** — callback ao concluir ou falhar uma execucao de review
+- **Webhook opcional** — callback ao concluir ou falhar execucoes de review/compliance
 
 ## Estado Atual
 
-O fluxo `review` esta implementado com endpoint HTTP, streaming SSE, cache por hash, webhook opcional, historico persistido, telemetria do OpenRouter e Docker Compose. Os fluxos `compliance`, `document`, `tests` e `batch` ainda estao fora do escopo entregue nesta fase.
+Os fluxos `review` e `compliance` estao implementados com endpoint HTTP, cache por hash, webhook opcional, historico persistido, telemetria do OpenRouter e Docker Compose. O fluxo `review` tambem possui streaming SSE. Os fluxos `document`, `tests` e `batch` ainda estao fora do escopo entregue nesta fase.
 
 ## Stack
 
@@ -75,6 +76,7 @@ docker compose logs -f api
 | GET    | `/health`           | Health check                       |
 | POST   | `/api/v1/review`    | Executa revisão de código          |
 | POST   | `/api/v1/review/stream` | Executa revisão via Server-Sent Events |
+| POST   | `/api/v1/compliance` | Avalia aderência entre tarefa e código |
 | GET    | `/api/v1/history`   | Lista últimas execuções            |
 | GET    | `/api/v1/history/:id` | Detalhes de uma execução         |
 | GET    | `/docs`             | Swagger UI (OpenAPI)               |
@@ -95,9 +97,32 @@ docker compose logs -f api
 
 Usa o mesmo payload do `/api/v1/review` e responde como `text/event-stream`, emitindo eventos `started`, `step`, `result`, `error` e `done`.
 
+### POST /api/v1/compliance
+
+```json
+{
+  "task_description": "Permitir renegociacao apenas para contratos ativos e registrar auditoria.",
+  "code": "if (contract.active) { renegotiate(contract); audit(contract.id); }",
+  "language": "typescript"
+}
+```
+
+Resposta:
+
+```json
+{
+  "compliant": true,
+  "compliance_score": 95,
+  "covered_requirements": ["Valida contrato ativo antes da renegociacao."],
+  "missing_requirements": [],
+  "partial_requirements": [],
+  "verdict": "Aderente."
+}
+```
+
 ### Webhook opcional
 
-Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de review envia um `POST` JSON para a URL ao finalizar com sucesso ou falha. Falhas no callback sao registradas no historico como step `webhook_callback`, mas nao alteram a resposta principal.
+Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review` ou `compliance` envia um `POST` JSON para a URL ao finalizar com sucesso ou falha. Falhas no callback sao registradas no historico como step `webhook_callback`, mas nao alteram a resposta principal.
 
 ```json
 {
@@ -131,7 +156,7 @@ Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de review envia
 
 > Variáveis LangSmith são opcionais. Para ativar tracing, defina `LANGSMITH_TRACING=true` e informe `LANGSMITH_API_KEY`.
 > OpenRouter foi escolhido por permitir alternar modelos via `OPENROUTER_DEFAULT_MODEL`. A execucao real exige `OPENROUTER_API_KEY`; custos dependem do modelo configurado.
-> Quando `WEBHOOK_CALLBACK_URL` estiver configurado, a API envia um `POST` JSON com status, `execution_id`, `cache_hit` e resultado ou erro do review.
+> Quando `WEBHOOK_CALLBACK_URL` estiver configurado, a API envia um `POST` JSON com `flow_type`, status, `execution_id`, `cache_hit` e resultado ou erro do fluxo.
 
 ## Estrutura do Projeto
 
@@ -145,6 +170,7 @@ src/
 │   └── openapi/                    # OpenAPI/Swagger setup
 ├── modules/
 │   ├── health/                     # Health check
+│   ├── compliance/                 # Avaliacao de aderencia tarefa x codigo
 │   ├── review/
 │   │   ├── engines/                # Review engine principal
 │   │   ├── graphs/                 # LangGraph (review-flow, review-language, per-language)
