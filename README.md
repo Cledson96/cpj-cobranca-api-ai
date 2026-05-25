@@ -13,6 +13,10 @@ API do case técnico CPJ-Cobrança para revisão automatizada de código usando 
 - **OpenRouter** — provedor LLM multi-modelo
 - **LangSmith** — tracing opcional (desligado por padrão)
 
+## Estado Atual
+
+O fluxo `review` esta implementado com endpoint HTTP, streaming SSE, cache por hash, historico persistido, telemetria do OpenRouter e Docker Compose. Os fluxos `compliance`, `document`, `tests`, `batch` e webhook ainda estao fora do escopo entregue nesta fase.
+
 ## Stack
 
 | Camada     | Tecnologia                          |
@@ -61,6 +65,7 @@ docker compose logs -f api
 
 > **Atenção:** a `DATABASE_URL` em Docker aponta para o serviço `postgres` automaticamente.  
 > Em ambiente local (sem Docker), use `localhost`. Veja `.env.example`.
+> O container da API executa `prisma migrate deploy` antes de iniciar o servidor.
 
 ## Endpoints
 
@@ -68,6 +73,7 @@ docker compose logs -f api
 |--------|---------------------|------------------------------------|
 | GET    | `/health`           | Health check                       |
 | POST   | `/api/v1/review`    | Executa revisão de código          |
+| POST   | `/api/v1/review/stream` | Executa revisão via Server-Sent Events |
 | GET    | `/api/v1/history`   | Lista últimas execuções            |
 | GET    | `/api/v1/history/:id` | Detalhes de uma execução         |
 | GET    | `/docs`             | Swagger UI (OpenAPI)               |
@@ -84,6 +90,10 @@ docker compose logs -f api
 
 **Languages suportados:** `typescript`, `javascript`, `python`, `php`
 
+### POST /api/v1/review/stream
+
+Usa o mesmo payload do `/api/v1/review` e responde como `text/event-stream`, emitindo eventos `started`, `step`, `result`, `error` e `done`.
+
 ## Ambiente
 
 | Variável                     | Exemplo                                           | Obrigatório |
@@ -94,8 +104,11 @@ docker compose logs -f api
 | `HOST`                       | `0.0.0.0`                                         | ❌          |
 | `PORT`                       | `3000`                                            | ❌          |
 | `LANGSMITH_TRACING`          | `false`                                           | ❌          |
+| `LANGSMITH_API_KEY`          | `lsv2_...`                                        | ❌          |
+| `LANGSMITH_PROJECT`          | `cpj-cobranca-api-ai`                             | ❌          |
 
 > Variáveis LangSmith são opcionais. Para ativar tracing, defina `LANGSMITH_TRACING=true` e informe `LANGSMITH_API_KEY`.
+> OpenRouter foi escolhido por permitir alternar modelos via `OPENROUTER_DEFAULT_MODEL`. A execucao real exige `OPENROUTER_API_KEY`; custos dependem do modelo configurado.
 
 ## Estrutura do Projeto
 
@@ -131,6 +144,7 @@ tests/                              # Testes Vitest
 prisma/
 ├── schema.prisma                   # Modelo de dados
 └── migrations/                     # Migrations
+```
 
 ## Comandos
 
@@ -144,6 +158,3 @@ prisma/
 | `npm run lint`       | ESLint                             |
 | `npm run prisma:generate` | Gera Prisma Client            |
 | `npm run prisma:migrate`  | Cria migration (dev)           |
-```
-
-> **Nota:** Este projeto foi gerado incrementalmente seguindo o plano em `docs/PLANO_INCREMENTAL.md`.

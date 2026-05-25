@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { formatDateTimeSaoPaulo, nowSaoPauloIso } from "@shared";
 
@@ -8,5 +9,13 @@ describe("date utils", () => {
 
   it("gera timestamp ISO com offset de Sao Paulo", () => {
     expect(nowSaoPauloIso()).toMatch(/-03:00$/);
+  });
+
+  it("usa imports dos plugins Dayjs compativeis com Node ESM", () => {
+    const source = readFileSync("src/shared/utils/date.ts", "utf8");
+
+    expect(source).toContain('"dayjs/plugin/customParseFormat.js"');
+    expect(source).toContain('"dayjs/plugin/timezone.js"');
+    expect(source).toContain('"dayjs/plugin/utc.js"');
   });
 });

@@ -33,7 +33,11 @@ export class ReviewController {
       "Content-Encoding": "none",
     });
 
+    let sentError = false;
+    let sentDone = false;
     const sendSSE = (event: string, data: unknown) => {
+      sentError = sentError || event === "error";
+      sentDone = sentDone || event === "done";
       reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
 
@@ -42,9 +46,13 @@ export class ReviewController {
         sendSSE(event, data);
       });
     } catch (error) {
-      const handled = handleUnknownError(error);
-      sendSSE("error", { message: handled.message });
-      sendSSE("done", {});
+      if (!sentDone) {
+        const handled = handleUnknownError(error);
+        if (!sentError) {
+          sendSSE("error", { message: handled.message });
+        }
+        sendSSE("done", {});
+      }
     } finally {
       reply.raw.end();
     }
