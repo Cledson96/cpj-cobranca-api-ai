@@ -17,5 +17,31 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cpj-cobranca-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      HOST: "0.0.0.0"
+      PORT: "3000"
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/cpj_cobranca?schema=public
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
+      OPENROUTER_DEFAULT_MODEL: openai/gpt-4o-mini
+      OPENROUTER_SITE_URL: http://localhost:3000
+      OPENROUTER_APP_TITLE: CPJ Cobranca API AI
+      OPENROUTER_FETCH_GENERATION_STATS: "true"
+      LANGSMITH_TRACING: "${LANGSMITH_TRACING:-false}"
+      LANGSMITH_API_KEY: "${LANGSMITH_API_KEY:-}"
+      LANGSMITH_PROJECT: cpj-cobranca-api-ai
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   cpj_cobranca_postgres_data:

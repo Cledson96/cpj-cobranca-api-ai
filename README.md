@@ -1,0 +1,149 @@
+# CPJ-Cobranca API AI
+
+API do case técnico CPJ-Cobrança para revisão automatizada de código usando agentes de IA (LangGraph + OpenRouter).
+
+## Funcionalidades
+
+- **Revisão de código** multi-linguagem (TypeScript, JavaScript, Python, PHP) usando agentes especialistas paralelos com roteamento por linguagem
+- **Grafos LangGraph** — orquestração de agentes especialistas (segurança, complexidade, resource leak, error handling, naming/clarity) com agregador final
+- **Ferramentas determinísticas** — análise estática complementar (regex patterns, lint-like checks)
+- **Histórico de execuções** — persistência em PostgreSQL via Prisma com steps e telemetria
+- **Suporte a cache** — hash da requisição + rate limiting integrado
+- **OpenAPI/Swagger UI** — docs interativos em `/docs`
+- **OpenRouter** — provedor LLM multi-modelo
+- **LangSmith** — tracing opcional (desligado por padrão)
+
+## Stack
+
+| Camada     | Tecnologia                          |
+|------------|-------------------------------------|
+| Runtime    | Node.js 22 + TypeScript 5.9         |
+| Framework  | Fastify 5                           |
+| ORM        | Prisma + PostgreSQL 16              |
+| Agentes    | LangGraph.js + LangChain.js         |
+| LLM        | OpenRouter (ChatOpenRouter)         |
+| Build      | tsup                                |
+| Testes     | Vitest                              |
+| Lint       | ESLint 9 (flat config)              |
+| Container  | Docker + Compose                    |
+
+## Quick Start (desenvolvimento local)
+
+```bash
+# 1. Instalar dependências
+npm install
+
+# 2. Subir PostgreSQL
+docker compose up -d postgres
+
+# 3. Configurar variáveis de ambiente
+cp .env.example .env
+# Edite .env e adicione OPENROUTER_API_KEY
+
+# 4. Rodar migrations
+npx prisma migrate dev --name init
+
+# 5. Iniciar servidor em modo dev
+npm run dev
+```
+
+Acesse em `http://localhost:3000/health` e `http://localhost:3000/docs`.
+
+## Docker (produção)
+
+```bash
+# Build e start completo (API + PostgreSQL)
+docker compose up --build -d
+
+# Ver logs
+docker compose logs -f api
+```
+
+> **Atenção:** a `DATABASE_URL` em Docker aponta para o serviço `postgres` automaticamente.  
+> Em ambiente local (sem Docker), use `localhost`. Veja `.env.example`.
+
+## Endpoints
+
+| Método | Rota                | Descrição                          |
+|--------|---------------------|------------------------------------|
+| GET    | `/health`           | Health check                       |
+| POST   | `/api/v1/review`    | Executa revisão de código          |
+| GET    | `/api/v1/history`   | Lista últimas execuções            |
+| GET    | `/api/v1/history/:id` | Detalhes de uma execução         |
+| GET    | `/docs`             | Swagger UI (OpenAPI)               |
+
+### POST /api/v1/review
+
+```json
+{
+  "code": "function sum(a, b) { return a + b; }",
+  "language": "typescript",
+  "context": "Descrição opcional do contexto"
+}
+```
+
+**Languages suportados:** `typescript`, `javascript`, `python`, `php`
+
+## Ambiente
+
+| Variável                     | Exemplo                                           | Obrigatório |
+|------------------------------|---------------------------------------------------|-------------|
+| `DATABASE_URL`               | `postgresql://postgres:postgres@localhost:5432/...` | ✅          |
+| `OPENROUTER_API_KEY`         | `sk-or-...`                                       | ✅          |
+| `OPENROUTER_DEFAULT_MODEL`   | `openai/gpt-4o-mini`                              | ✅          |
+| `HOST`                       | `0.0.0.0`                                         | ❌          |
+| `PORT`                       | `3000`                                            | ❌          |
+| `LANGSMITH_TRACING`          | `false`                                           | ❌          |
+
+> Variáveis LangSmith são opcionais. Para ativar tracing, defina `LANGSMITH_TRACING=true` e informe `LANGSMITH_API_KEY`.
+
+## Estrutura do Projeto
+
+```
+src/
+├── app.ts                          # App assembly (Fastify, plugins, rotas)
+├── server.ts                       # Entrypoint
+├── infrastructure/
+│   ├── database/                   # Prisma plugin
+│   ├── logging/                    # Logger (pino)
+│   └── openapi/                    # OpenAPI/Swagger setup
+├── modules/
+│   ├── health/                     # Health check
+│   ├── review/
+│   │   ├── engines/                # Review engine principal
+│   │   ├── graphs/                 # LangGraph (review-flow, review-language, per-language)
+│   │   ├── agents/                 # Agentes especialistas
+│   │   ├── tools/                  # Ferramentas determinísticas
+│   │   ├── routes/                 # POST /api/v1/review
+│   │   ├── controllers/            # Controller
+│   │   └── services/               # Service layer
+│   ├── history/                    # Histórico de execuções
+│   ├── executions/                 # Persistência (repositories)
+│   └── agent/
+│       ├── llm/                    # OpenRouter factory + structured output runner
+│       └── telemetry/              # Coletor de telemetria
+├── shared/
+│   ├── config/                     # Env loading + validação
+│   ├── contracts/                  # Zod schemas compartilhados
+│   ├── middlewares/                # Error handler, request context, security
+│   └── utils/                      # Hash, date
+tests/                              # Testes Vitest
+prisma/
+├── schema.prisma                   # Modelo de dados
+└── migrations/                     # Migrations
+
+## Comandos
+
+| Comando              | Descrição                          |
+|----------------------|------------------------------------|
+| `npm run dev`        | Dev server com hot reload (tsx)    |
+| `npm run build`      | Build para produção (tsup)         |
+| `npm start`          | Inicia servidor buildado           |
+| `npm test`           | Roda testes (Vitest)               |
+| `npm run typecheck`  | TypeScript type checking           |
+| `npm run lint`       | ESLint                             |
+| `npm run prisma:generate` | Gera Prisma Client            |
+| `npm run prisma:migrate`  | Cria migration (dev)           |
+```
+
+> **Nota:** Este projeto foi gerado incrementalmente seguindo o plano em `docs/PLANO_INCREMENTAL.md`.

@@ -1,0 +1,68 @@
+### ========================================
+### CPJ-Cobranca API — Manual Test Requests
+### ========================================
+### Base URL (local dev)
+@baseUrl = http://localhost:3000
+
+### -----------------------
+### Health Check
+### -----------------------
+GET {{baseUrl}}/health
+
+### -----------------------
+### POST Review — TypeScript
+### -----------------------
+POST {{baseUrl}}/api/v1/review
+Content-Type: application/json
+
+{
+  "code": "function calculateTotal(items: { price: number; quantity: number }[]): number {\n  return items.reduce((sum, item) => {\n    return sum + item.price * item.quantity;\n  }, 0);\n}",
+  "language": "typescript",
+  "context": "Função de cálculo de total em carrinho de compras"
+}
+
+### -----------------------
+### POST Review — JavaScript
+### -----------------------
+POST {{baseUrl}}/api/v1/review
+Content-Type: application/json
+
+{
+  "code": "const data = await fetch('https://api.example.com/users');\nconst users = await data.json();\nconsole.log(users);",
+  "language": "javascript",
+  "context": "Busca de usuários em API externa"
+}
+
+### -----------------------
+### POST Review — Python
+### -----------------------
+POST {{baseUrl}}/api/v1/review
+Content-Type: application/json
+
+{
+  "code": "def get_user(user_id):\n    conn = sqlite3.connect('database.db')\n    cursor = conn.cursor()\n    cursor.execute(f\"SELECT * FROM users WHERE id = {user_id}\")\n    return cursor.fetchone()",
+  "language": "python",
+  "context": "Função de consulta a banco SQLite"
+}
+
+### -----------------------
+### POST Review — PHP
+### -----------------------
+POST {{baseUrl}}/api/v1/review
+Content-Type: application/json
+
+{
+  "code": "<?php\nclass UserController {\n    public function getUser($id) {\n        global $db;\n        $result = mysqli_query($db, \"SELECT * FROM users WHERE id = $id\");\n        return mysqli_fetch_assoc($result);\n    }\n}",
+  "language": "php",
+  "context": "Controller PHP com SQL embutido"
+}
+
+### -----------------------
+### GET History — List Latest
+### -----------------------
+GET {{baseUrl}}/api/v1/history
+
+### -----------------------
+### GET History — By ID (replace with actual UUID)
+### -----------------------
+GET {{baseUrl}}/api/v1/history/00000000-0000-0000-0000-000000000000
