@@ -1,19 +1,33 @@
 import type { TestsRequest, TestsResponse } from "@shared";
+import { TestsEngine, type TestsExecutionPersistence } from "@/modules/tests/engines";
 
 export interface TestsService {
   execute(input: TestsRequest): Promise<TestsResponse>;
 }
 
-export class DefaultTestsService implements TestsService {
-  async execute(input: TestsRequest): Promise<TestsResponse> {
-    const framework = input.framework ?? "auto";
+export type TestsEngineLike = {
+  execute(input: TestsRequest): Promise<TestsResponse>;
+};
 
-    return {
-      framework,
-      strategy_summary: `Geracao inicial de testes para codigo ${input.language}.`,
-      test_cases: [],
-      test_code: "// Agente de testes real ainda nao conectado nesta etapa.",
-      gaps: ["Agente de testes real ainda nao conectado nesta etapa."],
-    };
+export type DefaultTestsServiceDependencies = {
+  testsEngine?: TestsEngineLike;
+  executionPersistence?: TestsExecutionPersistence;
+};
+
+export class DefaultTestsService implements TestsService {
+  private readonly testsEngine?: TestsEngineLike;
+  private readonly executionPersistence?: TestsExecutionPersistence;
+
+  constructor(dependencies: DefaultTestsServiceDependencies = {}) {
+    this.testsEngine = dependencies.testsEngine;
+    this.executionPersistence = dependencies.executionPersistence;
+  }
+
+  async execute(input: TestsRequest): Promise<TestsResponse> {
+    const engine = this.testsEngine ?? TestsEngine.createDefault({
+      persistence: this.executionPersistence,
+    });
+
+    return engine.execute(input);
   }
 }

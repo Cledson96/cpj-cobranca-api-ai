@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { TestsEngine, type TestsExecutionPersistence } from "@/modules/tests/engines";
+import {
+  TestsEngine,
+  type TestsExecutionPersistence,
+  type TestsWebhookNotifier,
+  type TestsWebhookPayload,
+} from "@/modules/tests/engines";
 import type { TestsGraphRunContext, TestsGraphRunner } from "@/modules/tests/graphs";
 import type { TestsRequest, TestsResponse } from "@shared";
 import type {
+  CreateCacheHitExecutionInput,
   CreatePendingExecutionInput,
   MarkExecutionFailedInput,
   MarkExecutionSuccessInput,
@@ -36,8 +42,10 @@ const testsOutput: TestsResponse = {
 
 class FakeTestsGraph implements TestsGraphRunner {
   lastContext?: TestsGraphRunContext;
+  calls = 0;
 
   async invoke(_input: TestsRequest, context?: TestsGraphRunContext): Promise<TestsResponse> {
+    this.calls += 1;
     this.lastContext = context;
     return testsOutput;
   }
@@ -51,10 +59,17 @@ class FailingTestsGraph implements TestsGraphRunner {
 
 class FakeTestsExecutionPersistence implements TestsExecutionPersistence {
   readonly pendingInputs: Array<CreatePendingExecutionInput<TestsRequest>> = [];
+  readonly cacheHitInputs: Array<CreateCacheHitExecutionInput<TestsRequest, TestsResponse>> = [];
   readonly successInputs: Array<MarkExecutionSuccessInput<TestsResponse>> = [];
   readonly failedInputs: MarkExecutionFailedInput[] = [];
   readonly stepInputs: RecordReviewExecutionStepInput[] = [];
   readonly telemetryInputs: RecordReviewExecutionTelemetryInput[] = [];
+  cachedRecord: ReviewExecutionRecord | null = null;
+
+  async findSuccessByHash(requestHash: string): Promise<ReviewExecutionRecord | null> {
+    void requestHash;
+    return this.cachedRecord;
+  }
 
   async createPending(input: CreatePendingExecutionInput<TestsRequest>): Promise<ReviewExecutionRecord> {
     this.pendingInputs.push(input);
@@ -69,6 +84,25 @@ class FakeTestsExecutionPersistence implements TestsExecutionPersistence {
       requestHash: input.requestHash,
       cacheHit: false,
       sourceExecutionId: null,
+      errorMessage: null,
+    };
+  }
+
+  async createCacheHit(
+    input: CreateCacheHitExecutionInput<TestsRequest, TestsResponse>,
+  ): Promise<ReviewExecutionRecord> {
+    this.cacheHitInputs.push(input);
+    return {
+      id: "execution-cache-1",
+      createdAt: "2026-05-24T12:00:00.000Z",
+      flowType: "tests",
+      status: "success",
+      inputPayload: input.inputPayload,
+      outputPayload: input.outputPayload,
+      durationMs: input.durationMs,
+      requestHash: input.requestHash,
+      cacheHit: true,
+      sourceExecutionId: input.sourceExecutionId,
       errorMessage: null,
     };
   }
@@ -132,6 +166,19 @@ class FakeTelemetrySource implements AgentExecutionTelemetrySource {
   }
 }
 
+class FakeTestsWebhookNotifier implements TestsWebhookNotifier {
+  readonly payloads: TestsWebhookPayload[] = [];
+
+  constructor(private readonly failWith?: Error) {}
+
+  async notify(payload: TestsWebhookPayload): Promise<void> {
+    this.payloads.push(payload);
+    if (this.failWith) {
+      throw this.failWith;
+    }
+  }
+}
+
 describe("TestsEngine com persistencia", () => {
   it("cria execucao pendente, envia contexto ao grafo e marca sucesso", async () => {
     const graph = new FakeTestsGraph();
@@ -157,6 +204,70 @@ describe("TestsEngine com persistencia", () => {
       modelRequested: "openai/gpt-4o-mini",
       openrouterGenerationId: "gen-tests-1",
     });
+  });
+
+  it("envia webhook de sucesso e registra step quando callback esta configurado", async () => {
+    const graph = new FakeTestsGraph();
+    const persistence = new FakeTestsExecutionPersistence();
+    const webhookNotifier = new FakeTestsWebhookNotifier();
+    const engine = new TestsEngine(graph, persistence, undefined, webhookNotifier);
+
+    await engine.execute(testsInput);
+
+    expect(webhookNotifier.payloads).toEqual([
+      {
+        flow_type: "tests",
+        execution_id: "execution-1",
+        status: "success",
+        cache_hit: false,
+        output: testsOutput,
+      },
+    ]);
+    expect(persistence.stepInputs.find((step) => step.nodeName === "webhook_callback")).toMatchObject({
+      executionId: "execution-1",
+      kind: "webhook",
+      status: "success",
+      inputPayload: { status: "success", cacheHit: false },
+      outputPayload: { delivered: true },
+    });
+  });
+
+  it("usa cache hit isolado de tests e envia webhook com cache_hit true", async () => {
+    const graph = new FakeTestsGraph();
+    const persistence = new FakeTestsExecutionPersistence();
+    const webhookNotifier = new FakeTestsWebhookNotifier();
+    persistence.cachedRecord = {
+      id: "execution-original",
+      createdAt: "2026-05-24T12:00:00.000Z",
+      flowType: "tests",
+      status: "success",
+      inputPayload: testsInput,
+      outputPayload: testsOutput,
+      durationMs: 900,
+      requestHash: "hash-original",
+      cacheHit: false,
+      sourceExecutionId: null,
+      errorMessage: null,
+    };
+    const engine = new TestsEngine(graph, persistence, undefined, webhookNotifier);
+
+    const output = await engine.execute(testsInput);
+
+    expect(output).toEqual(testsOutput);
+    expect(graph.calls).toBe(0);
+    expect(persistence.cacheHitInputs[0]).toMatchObject({
+      sourceExecutionId: "execution-original",
+      outputPayload: testsOutput,
+    });
+    expect(webhookNotifier.payloads).toEqual([
+      {
+        flow_type: "tests",
+        execution_id: "execution-cache-1",
+        status: "success",
+        cache_hit: true,
+        output: testsOutput,
+      },
+    ]);
   });
 
   it("marca execucao como falha quando o grafo quebra", async () => {

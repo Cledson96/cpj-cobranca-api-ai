@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
+import { AgentExecutionRepository } from "@/modules/executions";
 import { TestsController } from "@/modules/tests/controllers";
 import { testsRouteDocs } from "@/modules/tests/docs";
 import { DefaultTestsService, type TestsService } from "@/modules/tests/services";
+import type { TestsRequest, TestsResponse } from "@shared";
 
 export type TestsRoutesDependencies = {
   testsService?: TestsService;
@@ -15,7 +17,7 @@ export class TestsRoutes {
   }
 
   register(app: FastifyInstance): void {
-    const controller = new TestsController(this.createTestsService());
+    const controller = new TestsController(this.createTestsService(app));
 
     app.post(
       "/api/v1/tests",
@@ -27,7 +29,20 @@ export class TestsRoutes {
     );
   }
 
-  private createTestsService(): TestsService {
-    return this.dependencies.testsService ?? new DefaultTestsService();
+  private createTestsService(app: FastifyInstance): TestsService {
+    if (this.dependencies.testsService) {
+      return this.dependencies.testsService;
+    }
+
+    if ("prisma" in app) {
+      return new DefaultTestsService({
+        executionPersistence: new AgentExecutionRepository<TestsRequest, TestsResponse>(
+          app.prisma,
+          "tests",
+        ),
+      });
+    }
+
+    return new DefaultTestsService();
   }
 }
