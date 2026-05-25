@@ -33,3 +33,28 @@ export const reviewRouteDocs = {
     },
   },
 };
+
+export const reviewStreamRouteDocs = {
+  summary: "Executa code review automatizado com streaming SSE",
+  description:
+    "Analisa um trecho de codigo TypeScript, JavaScript ou Python e transmite em tempo real os passos da execucao via SSE (Server-Sent Events).",
+  tags: ["Review"],
+  body: toOpenApiSchema(reviewRequestSchema),
+  response: {
+    200: {
+      description: "Conexao de stream estabelecida. Retorna eventos SSE (text/event-stream).",
+      type: "string",
+    },
+    400: {
+      description: "Erro de validacao do payload",
+      type: "object",
+      properties: {
+        error: { type: "string", example: "invalid_request" },
+        message: { type: "string", example: "Payload invalido para stream de review." },
+        details: { type: "object" },
+      },
+      required: ["error", "message"],
+    },
+    500: reviewRouteDocs.response[500],
+  },
+};

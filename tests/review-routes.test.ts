@@ -20,6 +20,7 @@ const reviewResponse: ReviewResponse = {
 function createApp() {
   const reviewService = {
     execute: vi.fn().mockResolvedValue(reviewResponse),
+    executeStream: vi.fn().mockResolvedValue(reviewResponse),
   };
 
   return {
@@ -75,6 +76,7 @@ describe("POST /api/v1/review", () => {
   it("retorna 500 controlado quando service falha", async () => {
     const reviewService = {
       execute: vi.fn().mockRejectedValue(new Error("falha no provedor")),
+      executeStream: vi.fn(),
     };
     const app = buildApp({
       env: createTestEnv(),
@@ -94,6 +96,107 @@ describe("POST /api/v1/review", () => {
       error: "generic_error",
       message: "falha no provedor",
     });
+
+    await app.close();
+  });
+});
+
+describe("POST /api/v1/review/stream", () => {
+  it("executa stream de review com payload valido", async () => {
+    const reviewService = {
+      execute: vi.fn(),
+      executeStream: vi.fn().mockImplementation(async (_input, onEvent) => {
+        onEvent("started", { execution_id: "execution-stream-1", cache_hit: false });
+        onEvent("step", { node_name: "security_agent", kind: "llm", status: "success", duration_ms: 100 });
+        onEvent("result", { output: reviewResponse });
+        onEvent("done", {});
+        return reviewResponse;
+      }),
+    };
+    const app = buildApp({
+      env: createTestEnv(),
+      registerDatabase: false,
+      serverOptions: { logger: false },
+      dependencies: { reviewService },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/review/stream",
+      payload: validPayload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toBe("text/event-stream");
+
+    const body = response.body;
+    expect(body).toContain("event: started");
+    expect(body).toContain("event: step");
+    expect(body).toContain("event: result");
+    expect(body).toContain("event: done");
+    expect(body).toContain("execution-stream-1");
+    expect(body).toContain("security_agent");
+
+    expect(reviewService.executeStream).toHaveBeenCalledWith(validPayload, expect.any(Function));
+
+    await app.close();
+  });
+
+  it("retorna 400 para payload invalido no stream", async () => {
+    const reviewService = {
+      execute: vi.fn(),
+      executeStream: vi.fn(),
+    };
+    const app = buildApp({
+      env: createTestEnv(),
+      registerDatabase: false,
+      serverOptions: { logger: false },
+      dependencies: { reviewService },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/review/stream",
+      payload: {
+        code: "",
+        language: "typescript",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "bad_request",
+      message: "Payload invalido para stream de review.",
+    });
+
+    await app.close();
+  });
+
+  it("retorna evento de erro controlado quando stream quebra", async () => {
+    const reviewService = {
+      execute: vi.fn(),
+      executeStream: vi.fn().mockRejectedValue(new Error("falha no modelo de IA")),
+    };
+    const app = buildApp({
+      env: createTestEnv(),
+      registerDatabase: false,
+      serverOptions: { logger: false },
+      dependencies: { reviewService },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/review/stream",
+      payload: validPayload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toBe("text/event-stream");
+
+    const body = response.body;
+    expect(body).toContain("event: error");
+    expect(body).toContain("falha no modelo de IA");
+    expect(body).toContain("event: done");
 
     await app.close();
   });

@@ -181,7 +181,16 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
       cacheReadTokens: telemetry.cacheReadTokens,
     });
   }
+
+  getGraph(): ReviewGraphRunner {
+    return this.graph;
+  }
+
+  getTelemetrySource(): AgentExecutionTelemetrySource | undefined {
+    return this.telemetrySource;
+  }
 }
+
 
 function toNullableUsdString(value: number | null): string | null {
   return value === null ? null : value.toString();
