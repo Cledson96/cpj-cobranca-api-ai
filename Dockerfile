@@ -8,6 +8,7 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src/ ./src/
+COPY code-standards/ ./code-standards/
 RUN npm run build
 
 FROM node:22-alpine
@@ -19,6 +20,7 @@ RUN addgroup --system app && adduser --system --ingroup app app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/code-standards ./code-standards
 COPY package.json ./
 
 USER app

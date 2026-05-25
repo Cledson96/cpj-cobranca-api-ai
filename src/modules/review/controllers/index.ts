@@ -1,10 +1,14 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { reviewRequestSchema } from "@shared";
+import { pullRequestReviewRequestSchema, reviewRequestSchema } from "@shared";
 import { BadRequestError, handleUnknownError } from "@/infrastructure/errors";
 import type { ReviewService } from "@/modules/review/services";
+import type { PullRequestReviewService } from "@/modules/review/pull-request";
 
 export class ReviewController {
-  constructor(private readonly reviewService: ReviewService) {}
+  constructor(
+    private readonly reviewService: ReviewService,
+    private readonly pullRequestReviewService?: PullRequestReviewService,
+  ) {}
 
   async execute(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     try {
@@ -59,5 +63,28 @@ export class ReviewController {
     } finally {
       reply.raw.end();
     }
+  }
+
+  async executePullRequest(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    try {
+      const parsed = pullRequestReviewRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new BadRequestError("Payload invalido para review de pull request.", parsed.error.flatten());
+      }
+
+      const service = this.requirePullRequestReviewService();
+      const output = await service.execute(parsed.data);
+      reply.status(200).send(output);
+    } catch (error) {
+      throw handleUnknownError(error);
+    }
+  }
+
+  private requirePullRequestReviewService(): PullRequestReviewService {
+    if (!this.pullRequestReviewService) {
+      throw new Error("Servico de review de pull request nao configurado.");
+    }
+
+    return this.pullRequestReviewService;
   }
 }

@@ -1,6 +1,7 @@
 import { createPayloadHash, type DocumentRequest, type DocumentResponse } from "@shared";
 import { DocumentEngine, type DocumentExecutionPersistence } from "@/modules/document/engines";
 import type { FlowExecutionMetadata, ReviewExecutionRecord } from "@/modules/executions";
+import type { ModelRuntimeResolver } from "@/modules/models";
 import type { PromptRuntimeResolver } from "@/modules/prompts";
 
 export interface DocumentService {
@@ -16,23 +17,27 @@ export type DefaultDocumentServiceDependencies = {
   documentEngine?: DocumentEngineLike;
   executionPersistence?: DocumentExecutionPersistence;
   promptResolver?: PromptRuntimeResolver;
+  modelResolver?: ModelRuntimeResolver;
 };
 
 export class DefaultDocumentService implements DocumentService {
   private readonly documentEngine?: DocumentEngineLike;
   private readonly executionPersistence?: DocumentExecutionPersistence;
   private readonly promptResolver?: PromptRuntimeResolver;
+  private readonly modelResolver?: ModelRuntimeResolver;
 
   constructor(dependencies: DefaultDocumentServiceDependencies = {}) {
     this.documentEngine = dependencies.documentEngine;
     this.executionPersistence = dependencies.executionPersistence;
     this.promptResolver = dependencies.promptResolver;
+    this.modelResolver = dependencies.modelResolver;
   }
 
   async execute(input: DocumentRequest): Promise<DocumentResponse> {
     const engine = this.documentEngine ?? DocumentEngine.createDefault({
       persistence: this.executionPersistence,
       promptResolver: this.promptResolver,
+      requestedModel: await this.resolveModel(input.model),
     });
 
     return engine.execute(input);
@@ -55,5 +60,13 @@ export class DefaultDocumentService implements DocumentService {
       execution_id: execution?.id ?? null,
       cache_hit: execution?.cacheHit ?? null,
     };
+  }
+
+  private async resolveModel(requestedModel?: string): Promise<string | undefined> {
+    if (!this.modelResolver) {
+      return requestedModel;
+    }
+
+    return this.modelResolver.resolveRequestedModel(requestedModel);
   }
 }

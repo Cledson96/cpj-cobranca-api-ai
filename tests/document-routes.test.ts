@@ -8,6 +8,7 @@ const validPayload: DocumentRequest = {
   language: "typescript",
   doc_type: "technical",
   prompt_version: 2,
+  model: "openai/gpt-4o-mini",
 };
 
 const documentResponse: DocumentResponse = {

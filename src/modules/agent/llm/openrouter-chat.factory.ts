@@ -5,7 +5,7 @@ import { type AppEnv, loadEnv } from "@shared";
 export class OpenRouterChatFactory {
   constructor(private readonly env: AppEnv = loadEnv()) {}
 
-  create(): ChatOpenRouter {
+  create(model = this.env.OPENROUTER_DEFAULT_MODEL): ChatOpenRouter {
     if (!this.env.OPENROUTER_API_KEY) {
       throw new GenericError("OPENROUTER_API_KEY nao configurada para executar o agente de review.");
     }
@@ -14,7 +14,7 @@ export class OpenRouterChatFactory {
 
     return new ChatOpenRouter({
       apiKey: this.env.OPENROUTER_API_KEY,
-      model: this.env.OPENROUTER_DEFAULT_MODEL,
+      model,
       siteName: this.env.OPENROUTER_APP_TITLE,
       siteUrl: this.env.OPENROUTER_SITE_URL,
       temperature: 0,

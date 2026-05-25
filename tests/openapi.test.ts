@@ -25,6 +25,12 @@ describe("OpenAPI", () => {
             summary: expect.any(String),
           },
         },
+        "/api/v1/review/pull-request": {
+          post: {
+            tags: ["Review"],
+            summary: expect.any(String),
+          },
+        },
         "/api/v1/compliance": {
           post: {
             tags: ["Compliance"],

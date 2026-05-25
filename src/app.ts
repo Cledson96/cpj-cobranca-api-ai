@@ -7,6 +7,7 @@ import { ComplianceRoutes, type ComplianceRoutesDependencies } from "@/modules/c
 import { DocumentRoutes, type DocumentRoutesDependencies } from "@/modules/document";
 import { HealthRoutes } from "@/modules/health/routes";
 import { HistoryRoutes, type HistoryRoutesDependencies } from "@/modules/history";
+import { ModelsRoutes, type ModelsRoutesDependencies } from "@/modules/models";
 import { PromptsRoutes, type PromptsRoutesDependencies } from "@/modules/prompts";
 import { ReviewRoutes, type ReviewRoutesDependencies } from "@/modules/review";
 import { TestsRoutes, type TestsRoutesDependencies } from "@/modules/tests";
@@ -23,6 +24,7 @@ export type AppDependencies = BatchRoutesDependencies &
   ReviewRoutesDependencies &
   TestsRoutesDependencies &
   HistoryRoutesDependencies &
+  ModelsRoutesDependencies &
   PromptsRoutesDependencies;
 
 export type AppOptions = {
@@ -77,6 +79,7 @@ export class App {
     new TestsRoutes(dependencies).register(this.app);
     new BatchRoutes(dependencies).register(this.app);
     new HistoryRoutes(dependencies).register(this.app);
+    new ModelsRoutes(dependencies).register(this.app);
     new PromptsRoutes(dependencies).register(this.app);
   }
 

@@ -13,6 +13,7 @@ describe("review schemas", () => {
       language: "typescript",
       context: "Modulo de calculo simples",
       prompt_version: 2,
+      model: "openai/gpt-4o-mini",
     });
 
     expect(result).toEqual({
@@ -20,6 +21,7 @@ describe("review schemas", () => {
       language: "typescript",
       context: "Modulo de calculo simples",
       prompt_version: 2,
+      model: "openai/gpt-4o-mini",
     });
   });
 

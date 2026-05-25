@@ -8,6 +8,7 @@ const validPayload: TestsRequest = {
   language: "typescript",
   test_framework: "vitest",
   prompt_version: 5,
+  model: "deepseek/deepseek-v4-flash",
 };
 
 const testsResponse: TestsResponse = {

@@ -12,6 +12,7 @@ describe("compliance schemas", () => {
       code: "if (contract.active) { renegotiate(contract); audit(contract.id); }",
       language: "typescript",
       prompt_version: 3,
+      model: "deepseek/deepseek-v4-flash",
     });
 
     expect(result).toEqual({
@@ -19,6 +20,7 @@ describe("compliance schemas", () => {
       code: "if (contract.active) { renegotiate(contract); audit(contract.id); }",
       language: "typescript",
       prompt_version: 3,
+      model: "deepseek/deepseek-v4-flash",
     });
   });
 

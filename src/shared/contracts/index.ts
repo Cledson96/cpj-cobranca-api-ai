@@ -3,6 +3,8 @@ export * from "./compliance";
 export * from "./document";
 export * from "./flow-types";
 export * from "./history";
+export * from "./models";
 export * from "./prompts";
+export * from "./pull-request-review";
 export * from "./review";
 export * from "./tests";

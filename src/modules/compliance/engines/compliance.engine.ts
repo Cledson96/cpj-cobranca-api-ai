@@ -53,13 +53,15 @@ export class ComplianceEngine extends BaseAgentEngine<ComplianceRequest, Complia
     env?: AppEnv;
     persistence?: ComplianceExecutionPersistence;
     promptResolver?: PromptRuntimeResolver;
+    requestedModel?: string;
   } = {}): ComplianceEngine {
     const env = input.env ?? loadEnv();
-    const chatModel = new OpenRouterChatFactory(env).create();
+    const requestedModel = input.requestedModel ?? env.OPENROUTER_DEFAULT_MODEL;
+    const chatModel = new OpenRouterChatFactory(env).create(requestedModel);
     const telemetryCollector = new AgentTelemetryCollector();
     const structuredOutputRunner = new LangChainStructuredOutputRunner(chatModel, {
       generationStatsClient: OpenRouterGenerationStatsClient.createFromEnv(env),
-      modelRequested: env.OPENROUTER_DEFAULT_MODEL,
+      modelRequested: requestedModel,
       telemetrySink: telemetryCollector,
     });
 

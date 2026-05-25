@@ -5,11 +5,13 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 ## Funcionalidades
 
 - **Revisão de código** multi-linguagem (TypeScript, JavaScript, Python, PHP) usando agentes especialistas paralelos com roteamento por linguagem
+- **Review de Pull Request** via GitHub, com padrões TR, aderência ao projeto, segurança e critérios Jira opcionais
 - **Avaliação de aderência** entre tarefa e código implementado via fluxo `compliance`
 - **Documentação técnica ou operacional** gerada a partir de código via fluxo `document`
 - **Geração de testes** via fluxo `tests`, com casos classificados e arquivo de teste
 - **Execução em lote** via fluxo `batch`, orquestrando `review`, `compliance`, `document` e `tests`
 - **Gestão de prompts no banco** — cadastro, consulta, ativação e override por versão via `prompt_version`
+- **Catálogo de modelos no banco** — cadastro, edição, exclusão e seleção de modelo padrão global com override por request via `model`
 - **Grafos LangGraph** — orquestração de agentes especialistas (segurança, complexidade, resource leak, error handling, naming/clarity) com agregador final
 - **Ferramentas determinísticas** — análise estática complementar (regex patterns, lint-like checks)
 - **Histórico de execuções** — persistência em PostgreSQL via Prisma com steps e telemetria
@@ -21,7 +23,7 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 
 ## Estado Atual
 
-Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementados com endpoint HTTP, Docker Compose e documentacao OpenAPI. Os fluxos individuais possuem cache por hash, webhook opcional, historico persistido e telemetria do OpenRouter. O fluxo `review` tambem possui streaming SSE, o `batch` executa os fluxos prontos em sequencia com resumo persistido e metadados por item, e os prompts ativos passam a ser resolvidos de tabelas versionadas no PostgreSQL.
+Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementados com endpoint HTTP, Docker Compose e documentacao OpenAPI. Alem deles, o fluxo `pull_request_review` busca contexto no GitHub e Jira opcional. Os fluxos individuais possuem cache por hash, webhook opcional, historico persistido e telemetria do OpenRouter. O fluxo `review` tambem possui streaming SSE, o `batch` executa os fluxos prontos em sequencia com resumo persistido e metadados por item, os prompts ativos passam a ser resolvidos de tabelas versionadas no PostgreSQL e o modelo LLM usado em cada execucao sai de um catalogo persistido com padrao global configuravel.
 
 ## Stack
 
@@ -43,7 +45,7 @@ Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementa
 - **Fastify**: entrega uma API leve, com validação por schema, bom desempenho e integração simples com OpenAPI/Swagger.
 - **PostgreSQL + Prisma**: persiste histórico, steps de execução, cache por hash e telemetria sem acoplar a API ao SQL bruto.
 - **LangGraph.js + LangChain.js**: modela os fluxos como grafos explícitos, separando tools determinísticas, agentes especialistas, agregação e persistência de steps.
-- **OpenRouter**: permite trocar o modelo por variável de ambiente mantendo a integração de chat e structured output.
+- **OpenRouter**: mantém integração de chat e structured output, enquanto a escolha do modelo fica centralizada em catálogo persistido no banco.
 - **LangSmith opcional**: tracing fica disponível por configuração, sem bloquear execução local ou Docker quando não houver chave.
 - **Docker Compose**: sobe API e banco com migrations aplicadas antes do start da API.
 
@@ -97,6 +99,7 @@ docker compose logs -f api
 | GET    | `/health`           | Health check                       |
 | POST   | `/api/v1/review`    | Executa revisão de código          |
 | POST   | `/api/v1/review/stream` | Executa revisão via Server-Sent Events |
+| POST   | `/api/v1/review/pull-request` | Executa review de Pull Request do GitHub |
 | POST   | `/api/v1/compliance` | Avalia aderência entre tarefa e código |
 | POST   | `/api/v1/document` | Gera documentação técnica ou operacional |
 | POST   | `/api/v1/tests`    | Gera arquivo e casos de teste     |
@@ -108,6 +111,11 @@ docker compose logs -f api
 | GET    | `/api/v1/prompts/:flowType/:version` | Busca uma versao especifica |
 | POST   | `/api/v1/prompts` | Cadastra nova versao de prompt |
 | POST   | `/api/v1/prompts/:flowType/:version/activate` | Ativa uma versao de prompt |
+| GET    | `/api/v1/models` | Lista modelos cadastrados |
+| GET    | `/api/v1/models/default` | Busca o modelo padrao global |
+| POST   | `/api/v1/models` | Cadastra um modelo |
+| PATCH  | `/api/v1/models/:id` | Edita nome, status ou define como padrao |
+| DELETE | `/api/v1/models/:id` | Exclui um modelo nao padrao |
 | GET    | `/docs`             | Swagger UI (OpenAPI)               |
 
 ### POST /api/v1/review
@@ -117,7 +125,8 @@ docker compose logs -f api
   "code": "function sum(a, b) { return a + b; }",
   "language": "typescript",
   "context": "Descrição opcional do contexto",
-  "prompt_version": 2
+  "prompt_version": 2,
+  "model": "openai/gpt-4o-mini"
 }
 ```
 
@@ -127,6 +136,20 @@ docker compose logs -f api
 
 Usa o mesmo payload do `/api/v1/review` e responde como `text/event-stream`, emitindo eventos `started`, `step`, `result`, `error` e `done`.
 
+### POST /api/v1/review/pull-request
+
+```json
+{
+  "github_pull_request_url": "https://github.com/org/repo/pull/123",
+  "jira_issue_key": "CPJ-123",
+  "base_branch": "main",
+  "prompt_version": 1,
+  "model": "openai/gpt-4o-mini"
+}
+```
+
+`jira_issue_key` e opcional. Quando ele nao vem, a API nao consulta Jira e retorna `sections.jira_criteria.status` como `skipped`. Os padroes TR usados nessa analise ficam versionados no projeto em `code-standards/`.
+
 ### POST /api/v1/compliance
 
 ```json
@@ -134,7 +157,8 @@ Usa o mesmo payload do `/api/v1/review` e responde como `text/event-stream`, emi
   "task_description": "Permitir renegociacao apenas para contratos ativos e registrar auditoria.",
   "code": "if (contract.active) { renegotiate(contract); audit(contract.id); }",
   "language": "typescript",
-  "prompt_version": 3
+  "prompt_version": 3,
+  "model": "deepseek/deepseek-v4-flash"
 }
 ```
 
@@ -158,7 +182,8 @@ Resposta:
   "code": "export function charge(amount: number) { return amount > 0; }",
   "language": "typescript",
   "doc_type": "technical",
-  "prompt_version": 2
+  "prompt_version": 2,
+  "model": "openai/gpt-4o-mini"
 }
 ```
 
@@ -196,7 +221,8 @@ Resposta:
   "code": "export function charge(amount: number) { return amount > 0; }",
   "language": "typescript",
   "test_framework": "vitest",
-  "prompt_version": 5
+  "prompt_version": 5,
+  "model": "deepseek/deepseek-v4-flash"
 }
 ```
 
@@ -245,7 +271,7 @@ Executa itens de `review`, `compliance`, `document` e `tests` em sequencia. Use 
 }
 ```
 
-Cada `payload` de item tambem pode informar `prompt_version` para sobrescrever o prompt ativo apenas naquela execucao.
+Cada `payload` de item tambem pode informar `prompt_version` para sobrescrever o prompt ativo apenas naquela execucao e `model` para trocar o modelo padrao global por item.
 
 ### Prompt versioning
 
@@ -270,6 +296,35 @@ Exemplo de ativacao:
 
 ```http
 POST /api/v1/prompts/document/2/activate
+```
+
+### Model catalog
+
+Modelos permitidos ficam nas tabelas `RegisteredModel` e `GlobalModelSettings`. A API usa o modelo padrao global quando o campo `model` nao e informado, e rejeita qualquer nome que nao esteja cadastrado ou esteja inativo.
+
+Seed inicial:
+
+- `openai/gpt-4o-mini`
+- `deepseek/deepseek-v4-flash`
+
+Modelo padrao inicial:
+
+- `openai/gpt-4o-mini`
+
+Exemplo de cadastro:
+
+```json
+{
+  "name": "anthropic/claude-3.5-haiku"
+}
+```
+
+Exemplo de edicao para virar padrao:
+
+```json
+{
+  "is_default": true
+}
 ```
 
 Resposta:
@@ -339,6 +394,10 @@ Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review`, `c
 | `DATABASE_URL`               | `postgresql://postgres:postgres@localhost:5432/...` | ✅          |
 | `OPENROUTER_API_KEY`         | `sk-or-...`                                       | ✅          |
 | `OPENROUTER_DEFAULT_MODEL`   | `openai/gpt-4o-mini`                              | ✅          |
+| `GITHUB_TOKEN`               | `ghp_...`                                         | ✅ para PR review |
+| `JIRA_BASE_URL`              | `https://empresa.atlassian.net`                   | ❌          |
+| `JIRA_EMAIL`                 | `dev@empresa.com`                                 | ❌          |
+| `JIRA_API_TOKEN`             | `jira-token`                                      | ❌          |
 | `HOST`                       | `0.0.0.0`                                         | ❌          |
 | `PORT`                       | `3000`                                            | ❌          |
 | `LANGSMITH_TRACING`          | `false`                                           | ❌          |
@@ -347,7 +406,7 @@ Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review`, `c
 | `WEBHOOK_CALLBACK_URL`       | `https://example.com/webhook/cpj-cobranca`        | ❌          |
 
 > Variáveis LangSmith são opcionais. Para ativar tracing, defina `LANGSMITH_TRACING=true` e informe `LANGSMITH_API_KEY`.
-> OpenRouter foi escolhido por permitir alternar modelos via `OPENROUTER_DEFAULT_MODEL`. A execucao real exige `OPENROUTER_API_KEY`; custos dependem do modelo configurado.
+> `OPENROUTER_DEFAULT_MODEL` continua existindo como fallback operacional, mas a fonte principal do modelo em runtime agora e o catalogo persistido no banco com padrao global.
 > Quando `WEBHOOK_CALLBACK_URL` estiver configurado, a API envia um `POST` JSON com `flow_type`, status, `execution_id`, `cache_hit` e resultado ou erro do fluxo.
 
 ## O que eu faria com mais tempo

@@ -42,6 +42,14 @@ export type SimpleRuntimePromptSet = {
   agent: string;
 };
 
+export type PullRequestReviewRuntimePromptSet = {
+  code_standard: string;
+  jira_criteria: string;
+  project_consistency: string;
+  security: string;
+  aggregator: string;
+};
+
 export function toPromptVersionSummary(record: PromptVersionRecord): PromptVersionSummary {
   return {
     flow_type: record.flow_type,
@@ -64,4 +72,3 @@ export function toPromptVersionListResponse(records: PromptVersionRecord[]): Pro
     items: records.map(toPromptVersionSummary),
   };
 }
-

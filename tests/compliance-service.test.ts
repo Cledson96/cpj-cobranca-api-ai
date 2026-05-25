@@ -20,6 +20,26 @@ const complianceOutput: ComplianceResponse = {
 };
 
 describe("DefaultComplianceService", () => {
+  it("usa modelo padrao global quando a requisicao nao informa override", async () => {
+    const execute = vi.fn().mockResolvedValue(complianceOutput);
+    const createDefault = vi.spyOn(ComplianceEngine, "createDefault").mockReturnValue({
+      execute,
+    } as unknown as ComplianceEngine);
+    const modelResolver = {
+      resolveRequestedModel: vi.fn().mockResolvedValue("openai/gpt-4o-mini"),
+    };
+    const service = new DefaultComplianceService({ modelResolver });
+
+    const output = await service.execute(complianceInput);
+
+    expect(output).toEqual(complianceOutput);
+    expect(modelResolver.resolveRequestedModel).toHaveBeenCalledWith(undefined);
+    expect(createDefault).toHaveBeenCalledWith(expect.objectContaining({
+      requestedModel: "openai/gpt-4o-mini",
+    }));
+    createDefault.mockRestore();
+  });
+
   it("retorna metadados da execucao persistida", async () => {
     const complianceEngine = {
       execute: vi.fn().mockResolvedValue(complianceOutput),

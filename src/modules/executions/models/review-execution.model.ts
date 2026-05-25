@@ -1,7 +1,13 @@
 import type { ReviewRequest, ReviewResponse } from "@shared";
 
 export type ExecutionStatus = "pending" | "success" | "failed";
-export type AgentExecutionFlowType = "review" | "compliance" | "document" | "tests" | "batch";
+export type AgentExecutionFlowType =
+  | "review"
+  | "compliance"
+  | "document"
+  | "tests"
+  | "batch"
+  | "pull_request_review";
 export type ReviewFlowType = AgentExecutionFlowType;
 export type ExecutionStepKind =
   | "system"

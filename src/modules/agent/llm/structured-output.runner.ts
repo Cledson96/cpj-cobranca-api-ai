@@ -1,4 +1,5 @@
 import { ChatOpenRouter } from "@langchain/openrouter";
+import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { z } from "zod";
 import { GenericError, handleUnknownError } from "@/infrastructure/errors";
 import type { AgentExecutionTelemetrySink } from "../telemetry";
@@ -45,6 +46,13 @@ export function createStructuredOutputConfig(schemaName: string): StructuredOutp
   };
 }
 
+export type OpenRouterStructuredOutputSchema = Record<string, unknown>;
+
+export function createOpenRouterStructuredOutputSchema(schema: z.ZodType): OpenRouterStructuredOutputSchema {
+  const jsonSchema = cloneJsonSchema(toJsonSchema(schema));
+  return dereferenceJsonSchema(jsonSchema, jsonSchema);
+}
+
 const usageMetadataSchema = z.object({
   input_tokens: z.number().optional(),
   output_tokens: z.number().optional(),
@@ -76,7 +84,7 @@ export class LangChainStructuredOutputRunner implements StructuredOutputRunner {
   ): Promise<TOutput> {
     try {
       const structuredModel = this.chatModel.withStructuredOutput(
-        input.schema,
+        createOpenRouterStructuredOutputSchema(input.schema),
         createStructuredOutputConfig(input.schemaName),
       );
       const telemetryCallback = new OpenRouterTelemetryCallback();
@@ -133,4 +141,64 @@ export class LangChainStructuredOutputRunner implements StructuredOutputRunner {
       ...telemetry,
     });
   }
+}
+
+function cloneJsonSchema(schema: unknown): OpenRouterStructuredOutputSchema {
+  return JSON.parse(JSON.stringify(schema)) as OpenRouterStructuredOutputSchema;
+}
+
+function dereferenceJsonSchema(
+  node: unknown,
+  root: OpenRouterStructuredOutputSchema,
+  seenRefs: Set<string> = new Set(),
+): OpenRouterStructuredOutputSchema {
+  if (Array.isArray(node)) {
+    return node.map((item) => dereferenceJsonSchema(item, root, seenRefs)) as unknown as OpenRouterStructuredOutputSchema;
+  }
+
+  if (!node || typeof node !== "object") {
+    return node as OpenRouterStructuredOutputSchema;
+  }
+
+  const record = node as Record<string, unknown>;
+  const ref = record.$ref;
+
+  if (typeof ref === "string") {
+    if (seenRefs.has(ref)) {
+      return {};
+    }
+
+    const target = findJsonSchemaRef(root, ref);
+    const siblings = Object.fromEntries(Object.entries(record).filter(([key]) => key !== "$ref"));
+    const resolved = target
+      ? dereferenceJsonSchema(target, root, new Set([...seenRefs, ref]))
+      : {};
+
+    return dereferenceJsonSchema({
+      ...resolved,
+      ...siblings,
+    }, root, seenRefs);
+  }
+
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [key, dereferenceJsonSchema(value, root, seenRefs)]),
+  );
+}
+
+function findJsonSchemaRef(root: OpenRouterStructuredOutputSchema, ref: string): unknown {
+  if (!ref.startsWith("#/")) {
+    return null;
+  }
+
+  return ref
+    .slice(2)
+    .split("/")
+    .map((part) => part.replaceAll("~1", "/").replaceAll("~0", "~"))
+    .reduce<unknown>((current, part) => {
+      if (!current || typeof current !== "object") {
+        return null;
+      }
+
+      return (current as Record<string, unknown>)[part] ?? null;
+    }, root);
 }

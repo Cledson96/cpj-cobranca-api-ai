@@ -8,6 +8,7 @@ export const complianceRequestSchema = z.object({
   code: nonEmptyString(),
   language: supportedLanguageSchema,
   prompt_version: z.number().int().min(1).optional(),
+  model: nonEmptyString().optional(),
 });
 export type ComplianceRequest = z.infer<typeof complianceRequestSchema>;
 

@@ -1,4 +1,9 @@
-import { reviewRequestSchema, reviewResponseSchema } from "@shared";
+import {
+  pullRequestReviewRequestSchema,
+  pullRequestReviewResponseSchema,
+  reviewRequestSchema,
+  reviewResponseSchema,
+} from "@shared";
 import { toOpenApiSchema } from "@/infrastructure/openapi";
 
 export const reviewRouteDocs = {
@@ -55,6 +60,22 @@ export const reviewStreamRouteDocs = {
       },
       required: ["error", "message"],
     },
+    500: reviewRouteDocs.response[500],
+  },
+};
+
+export const pullRequestReviewRouteDocs = {
+  summary: "Executa review automatizado de pull request",
+  description:
+    "Busca um pull request no GitHub, compara com a branch base, avalia padroes TR, aderencia ao projeto, seguranca e criterios Jira opcionais.",
+  tags: ["Review"],
+  body: toOpenApiSchema(pullRequestReviewRequestSchema),
+  response: {
+    200: {
+      description: "Review de pull request gerado com sucesso",
+      ...toOpenApiSchema(pullRequestReviewResponseSchema),
+    },
+    400: reviewRouteDocs.response[400],
     500: reviewRouteDocs.response[500],
   },
 };

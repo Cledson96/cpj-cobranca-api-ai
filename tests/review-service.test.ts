@@ -18,6 +18,29 @@ const reviewOutput: ReviewResponse = {
 };
 
 describe("DefaultReviewService", () => {
+  it("resolve override de modelo antes de criar engine padrao", async () => {
+    const execute = vi.fn().mockResolvedValue(reviewOutput);
+    const createDefault = vi.spyOn(ReviewEngine, "createDefault").mockReturnValue({
+      execute,
+    } as unknown as ReviewEngine);
+    const modelResolver = {
+      resolveRequestedModel: vi.fn().mockResolvedValue("deepseek/deepseek-v4-flash"),
+    };
+    const service = new DefaultReviewService({ modelResolver });
+
+    const output = await service.execute({
+      ...reviewInput,
+      model: "deepseek/deepseek-v4-flash",
+    });
+
+    expect(output).toEqual(reviewOutput);
+    expect(modelResolver.resolveRequestedModel).toHaveBeenCalledWith("deepseek/deepseek-v4-flash");
+    expect(createDefault).toHaveBeenCalledWith(expect.objectContaining({
+      requestedModel: "deepseek/deepseek-v4-flash",
+    }));
+    createDefault.mockRestore();
+  });
+
   it("retorna metadados da execucao persistida", async () => {
     const reviewEngine = {
       execute: vi.fn().mockResolvedValue(reviewOutput),

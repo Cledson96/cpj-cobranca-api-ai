@@ -9,6 +9,7 @@ import type {
   RecordReviewExecutionStepInput,
   ReviewExecutionRecord,
 } from "@/modules/executions/models";
+import type { ModelRuntimeResolver } from "@/modules/models";
 import type { PromptRuntimeResolver } from "@/modules/prompts";
 
 export type StartedEventData = {
@@ -50,6 +51,7 @@ export type DefaultReviewServiceDependencies = {
   reviewEngine?: ReviewEngine;
   executionPersistence?: ReviewExecutionPersistence;
   promptResolver?: PromptRuntimeResolver;
+  modelResolver?: ModelRuntimeResolver;
 };
 
 export class DummyPersistence implements ReviewExecutionPersistence {
@@ -207,18 +209,17 @@ export class DefaultReviewService implements ReviewService {
   private reviewEngine?: ReviewEngine;
   private readonly executionPersistence?: ReviewExecutionPersistence;
   private readonly promptResolver?: PromptRuntimeResolver;
+  private readonly modelResolver?: ModelRuntimeResolver;
 
   constructor(dependencies: DefaultReviewServiceDependencies = {}) {
     this.reviewEngine = dependencies.reviewEngine;
     this.executionPersistence = dependencies.executionPersistence;
     this.promptResolver = dependencies.promptResolver;
+    this.modelResolver = dependencies.modelResolver;
   }
 
   async execute(input: ReviewRequest): Promise<ReviewResponse> {
-    const engine = this.reviewEngine ?? ReviewEngine.createDefault({
-      persistence: this.executionPersistence,
-      promptResolver: this.promptResolver,
-    });
+    const engine = await this.createEngine(input.model);
     return engine.execute(input);
   }
 
@@ -257,8 +258,29 @@ export class DefaultReviewService implements ReviewService {
       : ReviewEngine.createDefault({
           persistence: streamingPersistence,
           promptResolver: this.promptResolver,
+          requestedModel: await this.resolveModel(input.model),
         });
 
     return engine.execute(input);
+  }
+
+  private async createEngine(requestedModel?: string): Promise<ReviewEngine> {
+    if (this.reviewEngine) {
+      return this.reviewEngine;
+    }
+
+    return ReviewEngine.createDefault({
+      persistence: this.executionPersistence,
+      promptResolver: this.promptResolver,
+      requestedModel: await this.resolveModel(requestedModel),
+    });
+  }
+
+  private async resolveModel(requestedModel?: string): Promise<string | undefined> {
+    if (!this.modelResolver) {
+      return requestedModel;
+    }
+
+    return this.modelResolver.resolveRequestedModel(requestedModel);
   }
 }

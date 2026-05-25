@@ -92,4 +92,32 @@ describe("DefaultPromptsService", () => {
       agent: "template de testes",
     });
   });
+
+  it("resolve prompt de pull_request_review pela versao ativa", async () => {
+    const service = new DefaultPromptsService(createRepositoryStub({
+      findActive: async () => ({
+        flow_type: "pull_request_review",
+        version: 1,
+        name: "Pull Request Review v1",
+        is_active: true,
+        blocks: [
+          { block_key: "code_standard", system_prompt: "padrao" },
+          { block_key: "jira_criteria", system_prompt: "jira" },
+          { block_key: "project_consistency", system_prompt: "projeto" },
+          { block_key: "security", system_prompt: "seguranca" },
+          { block_key: "aggregator", system_prompt: "agregador" },
+        ],
+      }),
+    }));
+
+    const result = await service.resolvePullRequestReview();
+
+    expect(result).toEqual({
+      code_standard: "padrao",
+      jira_criteria: "jira",
+      project_consistency: "projeto",
+      security: "seguranca",
+      aggregator: "agregador",
+    });
+  });
 });

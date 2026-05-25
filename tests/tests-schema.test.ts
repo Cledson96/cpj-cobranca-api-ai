@@ -12,10 +12,12 @@ describe("tests schemas", () => {
       language: "typescript",
       test_framework: "vitest",
       prompt_version: 5,
+      model: "deepseek/deepseek-v4-flash",
     });
 
     expect(result.test_framework).toBe("vitest");
     expect(result.prompt_version).toBe(5);
+    expect(result.model).toBe("deepseek/deepseek-v4-flash");
   });
 
   it("aceita frameworks citados no case", () => {

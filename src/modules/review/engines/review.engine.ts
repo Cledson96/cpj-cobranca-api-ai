@@ -65,13 +65,15 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
     env?: AppEnv;
     persistence?: ReviewExecutionPersistence;
     promptResolver?: PromptRuntimeResolver;
+    requestedModel?: string;
   } = {}): ReviewEngine {
     const env = input.env ?? loadEnv();
-    const chatModel = new OpenRouterChatFactory(env).create();
+    const requestedModel = input.requestedModel ?? env.OPENROUTER_DEFAULT_MODEL;
+    const chatModel = new OpenRouterChatFactory(env).create(requestedModel);
     const telemetryCollector = new AgentTelemetryCollector();
     const structuredOutputRunner = new LangChainStructuredOutputRunner(chatModel, {
       generationStatsClient: OpenRouterGenerationStatsClient.createFromEnv(env),
-      modelRequested: env.OPENROUTER_DEFAULT_MODEL,
+      modelRequested: requestedModel,
       telemetrySink: telemetryCollector,
     });
 

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { AgentExecutionRepository } from "@/modules/executions";
+import { DefaultModelsService, PrismaRegisteredModelRepository, type ModelRuntimeResolver } from "@/modules/models";
 import { DefaultPromptsService, PrismaPromptVersionRepository, type PromptRuntimeResolver } from "@/modules/prompts";
 import { DocumentController } from "@/modules/document/controllers";
 import { documentRouteDocs } from "@/modules/document/docs";
@@ -9,6 +10,7 @@ import type { DocumentRequest, DocumentResponse } from "@shared";
 export type DocumentRoutesDependencies = {
   documentService?: DocumentService;
   promptResolver?: PromptRuntimeResolver;
+  modelResolver?: ModelRuntimeResolver;
 };
 
 export class DocumentRoutes {
@@ -39,6 +41,8 @@ export class DocumentRoutes {
     if ("prisma" in app) {
       const promptResolver = this.dependencies.promptResolver
         ?? new DefaultPromptsService(new PrismaPromptVersionRepository(app.prisma));
+      const modelResolver = this.dependencies.modelResolver
+        ?? new DefaultModelsService(new PrismaRegisteredModelRepository(app.prisma));
 
       return new DefaultDocumentService({
         executionPersistence: new AgentExecutionRepository<DocumentRequest, DocumentResponse>(
@@ -46,6 +50,7 @@ export class DocumentRoutes {
           "document",
         ),
         promptResolver,
+        modelResolver,
       });
     }
 

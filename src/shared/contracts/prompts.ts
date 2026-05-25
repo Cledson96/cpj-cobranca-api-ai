@@ -3,7 +3,13 @@ import { z } from "zod";
 const nonEmptyString = () => z.string().trim().min(1);
 const positiveInt = () => z.coerce.number().int().min(1);
 
-export const promptFlowTypeSchema = z.enum(["review", "compliance", "document", "tests"]);
+export const promptFlowTypeSchema = z.enum([
+  "review",
+  "compliance",
+  "document",
+  "tests",
+  "pull_request_review",
+]);
 export type PromptFlowType = z.infer<typeof promptFlowTypeSchema>;
 
 export const promptBlockKeySchema = z.enum([
@@ -14,6 +20,9 @@ export const promptBlockKeySchema = z.enum([
   "resource_leak",
   "complexity",
   "security",
+  "code_standard",
+  "jira_criteria",
+  "project_consistency",
 ]);
 export type PromptBlockKey = z.infer<typeof promptBlockKeySchema>;
 

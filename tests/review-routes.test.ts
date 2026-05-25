@@ -8,6 +8,7 @@ const validPayload: ReviewRequest = {
   language: "typescript",
   context: "Modulo simples",
   prompt_version: 2,
+  model: "openai/gpt-4o-mini",
 };
 
 const reviewResponse: ReviewResponse = {

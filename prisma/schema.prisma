@@ -12,6 +12,7 @@ enum FlowType {
   compliance
   document
   tests
+  pull_request_review
 }
 
 enum ExecutionFlowType {
@@ -20,6 +21,7 @@ enum ExecutionFlowType {
   document
   tests
   batch
+  pull_request_review
 }
 
 enum ExecutionStatus {
@@ -53,6 +55,9 @@ enum PromptBlockKey {
   resource_leak
   complexity
   security
+  code_standard
+  jira_criteria
+  project_consistency
 }
 
 model Execution {
@@ -126,6 +131,23 @@ model PromptVersion {
   @@unique([flowType, version, blockKey])
   @@index([flowType, isActive])
   @@index([flowType, version])
+}
+
+model RegisteredModel {
+  id        String              @id @default(uuid())
+  name      String              @unique
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  settings  GlobalModelSettings?
+}
+
+model GlobalModelSettings {
+  id             String          @id @default(uuid())
+  defaultModelId String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  defaultModel   RegisteredModel @relation(fields: [defaultModelId], references: [id], onDelete: Restrict)
 }
 
 model BatchExecution {

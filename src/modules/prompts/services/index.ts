@@ -14,6 +14,7 @@ import type {
   PromptVersionIdentifier,
   PromptVersionListInput,
   PromptVersionRecord,
+  PullRequestReviewRuntimePromptSet,
   ReviewRuntimePromptSet,
   SimpleRuntimePromptSet,
 } from "../models";
@@ -32,6 +33,13 @@ const REVIEW_REQUIRED_BLOCKS: PromptBlockKey[] = [
 ];
 
 const SIMPLE_REQUIRED_BLOCKS: PromptBlockKey[] = ["agent"];
+const PULL_REQUEST_REVIEW_REQUIRED_BLOCKS: PromptBlockKey[] = [
+  "code_standard",
+  "jira_criteria",
+  "project_consistency",
+  "security",
+  "aggregator",
+];
 
 export interface PromptsService {
   list(input: PromptVersionListInput): Promise<PromptVersionListResponse>;
@@ -46,6 +54,7 @@ export interface PromptRuntimeResolver {
   resolveCompliance(promptVersion?: number): Promise<SimpleRuntimePromptSet>;
   resolveDocument(promptVersion?: number): Promise<SimpleRuntimePromptSet>;
   resolveTests(promptVersion?: number): Promise<SimpleRuntimePromptSet>;
+  resolvePullRequestReview(promptVersion?: number): Promise<PullRequestReviewRuntimePromptSet>;
 }
 
 export type PromptVersionRepository = {
@@ -134,8 +143,22 @@ export class DefaultPromptsService implements PromptsService, PromptRuntimeResol
     return this.resolveSimpleFlow("tests", promptVersion);
   }
 
+  async resolvePullRequestReview(promptVersion?: number): Promise<PullRequestReviewRuntimePromptSet> {
+    const record = await this.resolveRecord("pull_request_review", promptVersion);
+    this.validateBlocks(record.flow_type, record.blocks.map((block) => block.block_key));
+
+    const blockMap = new Map(record.blocks.map((block) => [block.block_key, block.system_prompt]));
+    return {
+      code_standard: requireBlock(blockMap, "code_standard"),
+      jira_criteria: requireBlock(blockMap, "jira_criteria"),
+      project_consistency: requireBlock(blockMap, "project_consistency"),
+      security: requireBlock(blockMap, "security"),
+      aggregator: requireBlock(blockMap, "aggregator"),
+    };
+  }
+
   private async resolveSimpleFlow(
-    flowType: Exclude<PromptFlowType, "review">,
+    flowType: Exclude<PromptFlowType, "review" | "pull_request_review">,
     promptVersion?: number,
   ): Promise<SimpleRuntimePromptSet> {
     const record = await this.resolveRecord(flowType, promptVersion);
@@ -166,7 +189,11 @@ export class DefaultPromptsService implements PromptsService, PromptRuntimeResol
   }
 
   private validateBlocks(flowType: PromptFlowType, blockKeys: PromptBlockKey[]): void {
-    const requiredBlocks = flowType === "review" ? REVIEW_REQUIRED_BLOCKS : SIMPLE_REQUIRED_BLOCKS;
+    const requiredBlocks = flowType === "review"
+      ? REVIEW_REQUIRED_BLOCKS
+      : flowType === "pull_request_review"
+        ? PULL_REQUEST_REVIEW_REQUIRED_BLOCKS
+        : SIMPLE_REQUIRED_BLOCKS;
     const uniqueBlockKeys = new Set(blockKeys);
 
     if (uniqueBlockKeys.size !== blockKeys.length) {
@@ -177,6 +204,14 @@ export class DefaultPromptsService implements PromptsService, PromptRuntimeResol
       const missingBlocks = requiredBlocks.filter((blockKey) => !uniqueBlockKeys.has(blockKey));
       if (missingBlocks.length > 0) {
         throw new BadRequestError(`Prompt de review incompleto. Blocos ausentes: ${missingBlocks.join(", ")}.`);
+      }
+      return;
+    }
+
+    if (flowType === "pull_request_review") {
+      const missingBlocks = requiredBlocks.filter((blockKey) => !uniqueBlockKeys.has(blockKey));
+      if (missingBlocks.length > 0) {
+        throw new BadRequestError(`Prompt de pull_request_review incompleto. Blocos ausentes: ${missingBlocks.join(", ")}.`);
       }
       return;
     }
@@ -231,4 +266,35 @@ export class LegacyPromptRuntimeResolver implements PromptRuntimeResolver {
   async resolveTests(): Promise<SimpleRuntimePromptSet> {
     return { agent: TestsPromptCatalog.defaultTemplate() };
   }
+
+  async resolvePullRequestReview(): Promise<PullRequestReviewRuntimePromptSet> {
+    return defaultPullRequestReviewPrompts();
+  }
+}
+
+export function defaultPullRequestReviewPrompts(): PullRequestReviewRuntimePromptSet {
+  return {
+    code_standard: [
+      "Voce avalia se um pull request segue os padroes corporativos TR.",
+      "Use os guias de padrao recebidos como fonte principal.",
+      "Retorne achados objetivos com arquivo, linha quando possivel, descricao e sugestao.",
+    ].join("\n"),
+    jira_criteria: [
+      "Voce compara o diff do pull request com os criterios de aceite do card Jira.",
+      "Avalie somente os criterios informados e cite evidencias concretas do codigo alterado.",
+    ].join("\n"),
+    project_consistency: [
+      "Voce avalia se o pull request esta condizente com o estilo, arquitetura e padroes ja existentes no projeto.",
+      "Compare o diff com os arquivos de contexto enviados.",
+    ].join("\n"),
+    security: [
+      "Voce faz uma revisao de seguranca por IA no pull request.",
+      "Procure vulnerabilidades, vazamento de segredo, injecao, autorizacao ausente, validacao insuficiente e exposicao indevida de dados.",
+    ].join("\n"),
+    aggregator: [
+      "Voce consolida as analises de padrao, Jira, consistencia do projeto e seguranca em um relatorio JSON final.",
+      "Use verdict approved apenas quando nao houver achados relevantes.",
+      "Use changes_requested quando houver falhas de seguranca, criterios nao atendidos ou divergencias importantes de padrao.",
+    ].join("\n"),
+  };
 }

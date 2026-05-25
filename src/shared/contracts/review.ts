@@ -8,6 +8,7 @@ export const reviewRequestSchema = z.object({
   language: supportedLanguageSchema,
   context: z.string().trim().optional(),
   prompt_version: z.number().int().min(1).optional(),
+  model: nonEmptyString().optional(),
 });
 export type ReviewRequest = z.infer<typeof reviewRequestSchema>;
 

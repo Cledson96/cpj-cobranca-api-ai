@@ -12,10 +12,12 @@ describe("document schemas", () => {
       language: "typescript",
       doc_type: "technical",
       prompt_version: 2,
+      model: "openai/gpt-4o-mini",
     });
 
     expect(result.doc_type).toBe("technical");
     expect(result.prompt_version).toBe(2);
+    expect(result.model).toBe("openai/gpt-4o-mini");
   });
 
   it("aceita documentacao operacional para squads e produto", () => {

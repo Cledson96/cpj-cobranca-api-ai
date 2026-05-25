@@ -32,6 +32,10 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((value) => value === "true"),
+  GITHUB_TOKEN: z.string().trim().default(""),
+  JIRA_BASE_URL: optionalUrl,
+  JIRA_EMAIL: z.string().trim().default(""),
+  JIRA_API_TOKEN: z.string().trim().default(""),
   LANGSMITH_TRACING: booleanString,
   LANGSMITH_API_KEY: z.string().trim().default(""),
   LANGSMITH_PROJECT: z.string().trim().min(1).default("cpj-cobranca-api-ai"),
