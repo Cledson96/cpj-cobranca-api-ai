@@ -1,7 +1,8 @@
 import type { ReviewRequest, ReviewResponse } from "@shared";
 
 export type ExecutionStatus = "pending" | "success" | "failed";
-export type ReviewFlowType = "review" | "compliance" | "document" | "tests" | "batch";
+export type AgentExecutionFlowType = "review" | "compliance" | "document" | "tests" | "batch";
+export type ReviewFlowType = AgentExecutionFlowType;
 export type ExecutionStepKind =
   | "system"
   | "tool"
@@ -42,7 +43,7 @@ export type ReviewExecutionStepRecord = {
 export type ReviewExecutionRecord = {
   id: string;
   createdAt: Date | string;
-  flowType: ReviewFlowType;
+  flowType: AgentExecutionFlowType;
   status: ExecutionStatus;
   inputPayload?: unknown;
   outputPayload?: unknown;
@@ -70,28 +71,35 @@ export type PrismaExecutionTelemetryDelegate = {
   upsert(input: unknown): Promise<unknown>;
 };
 
-export type ReviewExecutionRepositoryPrisma = {
+export type AgentExecutionRepositoryPrisma = {
   execution: PrismaExecutionDelegate;
   executionStep: PrismaExecutionStepDelegate;
   executionTelemetry: PrismaExecutionTelemetryDelegate;
 };
+export type ReviewExecutionRepositoryPrisma = AgentExecutionRepositoryPrisma;
 
-export type CreatePendingReviewExecutionInput = {
-  inputPayload: ReviewRequest;
+export type CreatePendingExecutionInput<TInput = unknown> = {
+  inputPayload: TInput;
   requestHash: string;
 };
 
-export type MarkReviewExecutionSuccessInput = {
+export type CreatePendingReviewExecutionInput = CreatePendingExecutionInput<ReviewRequest>;
+
+export type MarkExecutionSuccessInput<TOutput = unknown> = {
   id: string;
-  outputPayload: ReviewResponse;
+  outputPayload: TOutput;
   durationMs: number;
 };
 
-export type MarkReviewExecutionFailedInput = {
+export type MarkReviewExecutionSuccessInput = MarkExecutionSuccessInput<ReviewResponse>;
+
+export type MarkExecutionFailedInput = {
   id: string;
   errorMessage: string;
   durationMs: number;
 };
+
+export type MarkReviewExecutionFailedInput = MarkExecutionFailedInput;
 
 export type RecordReviewExecutionStepInput = {
   executionId: string;
@@ -117,6 +125,14 @@ export type RecordReviewExecutionTelemetryInput = {
   inputCostUsd?: string | null;
   outputCostUsd?: string | null;
   cacheReadTokens?: number | null;
+};
+
+export type CreateCacheHitExecutionInput<TInput = unknown, TOutput = unknown> = {
+  inputPayload: TInput;
+  requestHash: string;
+  sourceExecutionId: string;
+  outputPayload: TOutput;
+  durationMs: number;
 };
 
 export type ReviewExecutionTelemetry = {
