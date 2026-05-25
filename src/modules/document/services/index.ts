@@ -1,8 +1,10 @@
-import type { DocumentRequest, DocumentResponse } from "@shared";
+import { createPayloadHash, type DocumentRequest, type DocumentResponse } from "@shared";
 import { DocumentEngine, type DocumentExecutionPersistence } from "@/modules/document/engines";
+import type { FlowExecutionMetadata, ReviewExecutionRecord } from "@/modules/executions";
 
 export interface DocumentService {
   execute(input: DocumentRequest): Promise<DocumentResponse>;
+  executeWithMetadata?(input: DocumentRequest): Promise<FlowExecutionMetadata<DocumentResponse>>;
 }
 
 export type DocumentEngineLike = {
@@ -29,5 +31,24 @@ export class DefaultDocumentService implements DocumentService {
     });
 
     return engine.execute(input);
+  }
+
+  async executeWithMetadata(input: DocumentRequest): Promise<FlowExecutionMetadata<DocumentResponse>> {
+    const output = await this.execute(input);
+    let execution: ReviewExecutionRecord | null = null;
+
+    if (this.executionPersistence) {
+      try {
+        execution = await this.executionPersistence.findSuccessByHash(createPayloadHash(input));
+      } catch {
+        // Falhas na consulta de metadados nao devem transformar sucesso em erro.
+      }
+    }
+
+    return {
+      output,
+      execution_id: execution?.id ?? null,
+      cache_hit: execution?.cacheHit ?? null,
+    };
   }
 }

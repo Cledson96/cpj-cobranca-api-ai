@@ -56,6 +56,12 @@ export type ReviewExecutionRecord = {
   steps?: ReviewExecutionStepRecord[];
 };
 
+export type FlowExecutionMetadata<TOutput> = {
+  output: TOutput;
+  execution_id: string | null;
+  cache_hit: boolean | null;
+};
+
 export type PrismaExecutionDelegate = {
   create(input: unknown): Promise<ReviewExecutionRecord>;
   update(input: unknown): Promise<ReviewExecutionRecord>;

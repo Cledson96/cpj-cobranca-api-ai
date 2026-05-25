@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import dayjs from "dayjs";
+import type { FlowExecutionMetadata } from "@/modules/executions";
 import type {
   BatchItemFlowType,
   BatchRequest,
@@ -18,6 +19,7 @@ import type {
 type BatchRequestItem = BatchRequest["items"][number];
 type FlowExecutionService<TInput, TOutput> = {
   execute(input: TInput): Promise<TOutput>;
+  executeWithMetadata?(input: TInput): Promise<FlowExecutionMetadata<TOutput>>;
 };
 type ReviewBatchService = FlowExecutionService<ReviewRequest, ReviewResponse>;
 type ComplianceBatchService = FlowExecutionService<ComplianceRequest, ComplianceResponse>;
@@ -101,15 +103,15 @@ export class DefaultBatchService implements BatchService {
 
   private async executeItem(index: number, item: BatchRequestItem): Promise<BatchResult> {
     try {
-      const output = await this.executeFlowItem(item);
+      const result = await this.executeFlowItem(item);
 
       return {
         index,
         flow_type: item.flow_type,
-        execution_id: null,
+        execution_id: result.execution_id,
         status: "success",
-        cache_hit: null,
-        output,
+        cache_hit: result.cache_hit,
+        output: result.output,
         error_message: null,
       };
     } catch (error) {
@@ -125,18 +127,34 @@ export class DefaultBatchService implements BatchService {
     }
   }
 
-  private executeFlowItem(item: BatchRequestItem): Promise<unknown> {
+  private executeFlowItem(item: BatchRequestItem): Promise<FlowExecutionMetadata<unknown>> {
     switch (item.flow_type) {
       case "review":
-        return requireService(this.reviewService, "review").execute(item.payload);
+        return executeService(requireService(this.reviewService, "review"), item.payload);
       case "compliance":
-        return requireService(this.complianceService, "compliance").execute(item.payload);
+        return executeService(requireService(this.complianceService, "compliance"), item.payload);
       case "document":
-        return requireService(this.documentService, "document").execute(item.payload);
+        return executeService(requireService(this.documentService, "document"), item.payload);
       case "tests":
-        return requireService(this.testsService, "tests").execute(item.payload);
+        return executeService(requireService(this.testsService, "tests"), item.payload);
     }
   }
+}
+
+async function executeService<TInput, TOutput>(
+  service: FlowExecutionService<TInput, TOutput>,
+  input: TInput,
+): Promise<FlowExecutionMetadata<TOutput>> {
+  if (service.executeWithMetadata) {
+    return service.executeWithMetadata(input);
+  }
+
+  const output = await service.execute(input);
+  return {
+    output,
+    execution_id: null,
+    cache_hit: null,
+  };
 }
 
 function requireService<T>(service: T | undefined, flowType: BatchItemFlowType): T {

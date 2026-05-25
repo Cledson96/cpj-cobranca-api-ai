@@ -20,7 +20,7 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 
 ## Estado Atual
 
-Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementados com endpoint HTTP, Docker Compose e documentacao OpenAPI. Os fluxos individuais possuem cache por hash, webhook opcional, historico persistido e telemetria do OpenRouter. O fluxo `review` tambem possui streaming SSE, e o `batch` executa os fluxos prontos em sequencia com resumo persistido.
+Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementados com endpoint HTTP, Docker Compose e documentacao OpenAPI. Os fluxos individuais possuem cache por hash, webhook opcional, historico persistido e telemetria do OpenRouter. O fluxo `review` tambem possui streaming SSE, e o `batch` executa os fluxos prontos em sequencia com resumo persistido e metadados por item.
 
 ## Stack
 
@@ -209,7 +209,7 @@ Resposta:
 
 ### POST /api/v1/batch
 
-Executa itens de `review`, `compliance`, `document` e `tests` em sequencia. Use `continue_on_error=false` para interromper no primeiro item com falha. O retorno do batch traz `execution_id` e `cache_hit` nulos por item no v1; a rastreabilidade detalhada dos subfluxos fica em `/api/v1/history`.
+Executa itens de `review`, `compliance`, `document` e `tests` em sequencia. Use `continue_on_error=false` para interromper no primeiro item com falha. Cada item retorna `execution_id` e `cache_hit` quando o fluxo roda com persistencia; a rastreabilidade detalhada dos subfluxos tambem fica em `/api/v1/history`.
 
 ```json
 {
@@ -245,15 +245,29 @@ Resposta:
     {
       "index": 0,
       "flow_type": "review",
-      "execution_id": null,
+      "execution_id": "execution-review-1",
       "status": "success",
-      "cache_hit": null,
+      "cache_hit": false,
       "output": {
         "overall_quality": "good",
         "score": 9,
         "issues": [],
         "positives": ["Codigo simples e legivel."],
         "summary": "Sem problemas relevantes."
+      },
+      "error_message": null
+    },
+    {
+      "index": 1,
+      "flow_type": "tests",
+      "execution_id": "execution-tests-1",
+      "status": "success",
+      "cache_hit": true,
+      "output": {
+        "framework": "vitest",
+        "test_file": "import { expect, it } from 'vitest';\nimport { charge } from './charge';",
+        "test_cases": [],
+        "coverage_hints": []
       },
       "error_message": null
     }
@@ -301,7 +315,6 @@ Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review`, `c
 
 ## O que eu faria com mais tempo
 
-- Retornar `execution_id` e `cache_hit` reais por item do `batch`, além do resumo persistido atual.
 - Adicionar streaming SSE também para `/api/v1/document`, embora o diferencial de streaming já esteja coberto em `/api/v1/review/stream`.
 - Criar uma suíte de avaliação com fixtures maiores por linguagem e snapshots de qualidade dos agentes.
 - Adicionar retry/backoff configurável para chamadas ao provedor LLM e webhook externo.

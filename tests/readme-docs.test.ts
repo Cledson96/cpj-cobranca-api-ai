@@ -34,4 +34,10 @@ describe("README final", () => {
     expect(readme).not.toContain('"audience": "developer"');
     expect(readme).not.toContain('"detail_level": "standard"');
   });
+
+  it("documenta batch com metadados por item", () => {
+    expect(readme).toContain('"execution_id": "execution-review-1"');
+    expect(readme).toContain('"cache_hit": false');
+    expect(readme).not.toContain("execution_id` e `cache_hit` nulos por item no v1");
+  });
 });

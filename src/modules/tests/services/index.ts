@@ -1,8 +1,10 @@
-import type { TestsRequest, TestsResponse } from "@shared";
+import { createPayloadHash, type TestsRequest, type TestsResponse } from "@shared";
 import { TestsEngine, type TestsExecutionPersistence } from "@/modules/tests/engines";
+import type { FlowExecutionMetadata, ReviewExecutionRecord } from "@/modules/executions";
 
 export interface TestsService {
   execute(input: TestsRequest): Promise<TestsResponse>;
+  executeWithMetadata?(input: TestsRequest): Promise<FlowExecutionMetadata<TestsResponse>>;
 }
 
 export type TestsEngineLike = {
@@ -29,5 +31,24 @@ export class DefaultTestsService implements TestsService {
     });
 
     return engine.execute(input);
+  }
+
+  async executeWithMetadata(input: TestsRequest): Promise<FlowExecutionMetadata<TestsResponse>> {
+    const output = await this.execute(input);
+    let execution: ReviewExecutionRecord | null = null;
+
+    if (this.executionPersistence) {
+      try {
+        execution = await this.executionPersistence.findSuccessByHash(createPayloadHash(input));
+      } catch {
+        // Falhas na consulta de metadados nao devem transformar sucesso em erro.
+      }
+    }
+
+    return {
+      output,
+      execution_id: execution?.id ?? null,
+      cache_hit: execution?.cacheHit ?? null,
+    };
   }
 }

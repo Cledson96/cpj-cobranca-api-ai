@@ -1,7 +1,8 @@
-import type { ReviewRequest, ReviewResponse } from "@shared";
+import { createPayloadHash, type ReviewRequest, type ReviewResponse } from "@shared";
 import { ReviewEngine, type ReviewExecutionPersistence } from "../engines";
 import type {
   CreatePendingReviewExecutionInput,
+  FlowExecutionMetadata,
   MarkReviewExecutionFailedInput,
   MarkReviewExecutionSuccessInput,
   RecordReviewExecutionTelemetryInput,
@@ -40,6 +41,7 @@ export type StreamingEventListener = (
 
 export interface ReviewService {
   execute(input: ReviewRequest): Promise<ReviewResponse>;
+  executeWithMetadata?(input: ReviewRequest): Promise<FlowExecutionMetadata<ReviewResponse>>;
   executeStream(input: ReviewRequest, onEvent: StreamingEventListener): Promise<ReviewResponse>;
 }
 
@@ -213,6 +215,25 @@ export class DefaultReviewService implements ReviewService {
       persistence: this.executionPersistence,
     });
     return engine.execute(input);
+  }
+
+  async executeWithMetadata(input: ReviewRequest): Promise<FlowExecutionMetadata<ReviewResponse>> {
+    const output = await this.execute(input);
+    let execution: ReviewExecutionRecord | null = null;
+
+    if (this.executionPersistence) {
+      try {
+        execution = await this.executionPersistence.findSuccessByHash(createPayloadHash(input));
+      } catch {
+        // Falhas na consulta de metadados nao devem transformar sucesso em erro.
+      }
+    }
+
+    return {
+      output,
+      execution_id: execution?.id ?? null,
+      cache_hit: execution?.cacheHit ?? null,
+    };
   }
 
   async executeStream(input: ReviewRequest, onEvent: StreamingEventListener): Promise<ReviewResponse> {

@@ -78,6 +78,56 @@ describe("DefaultBatchService", () => {
     });
   });
 
+  it("propaga execution_id e cache_hit reais quando o fluxo retorna metadados", async () => {
+    const reviewService = {
+      execute: vi.fn(),
+      executeWithMetadata: vi.fn().mockResolvedValue({
+        output: reviewOutput,
+        execution_id: "execution-review-1",
+        cache_hit: false,
+      }),
+    };
+    const testsService = {
+      execute: vi.fn(),
+      executeWithMetadata: vi.fn().mockResolvedValue({
+        output: testsOutput,
+        execution_id: "execution-tests-1",
+        cache_hit: true,
+      }),
+    };
+    const service = new DefaultBatchService({
+      reviewService,
+      complianceService: { execute: vi.fn() },
+      documentService: { execute: vi.fn() },
+      testsService,
+    });
+
+    const output = await service.execute(batchInput);
+
+    expect(output.results).toMatchObject([
+      {
+        index: 0,
+        flow_type: "review",
+        status: "success",
+        execution_id: "execution-review-1",
+        cache_hit: false,
+        output: reviewOutput,
+      },
+      {
+        index: 1,
+        flow_type: "tests",
+        status: "success",
+        execution_id: "execution-tests-1",
+        cache_hit: true,
+        output: testsOutput,
+      },
+    ]);
+    expect(reviewService.executeWithMetadata).toHaveBeenCalledWith(batchInput.items[0]?.payload);
+    expect(testsService.executeWithMetadata).toHaveBeenCalledWith(batchInput.items[1]?.payload);
+    expect(reviewService.execute).not.toHaveBeenCalled();
+    expect(testsService.execute).not.toHaveBeenCalled();
+  });
+
   it("continua apos erro quando continue_on_error e true e marca partial", async () => {
     const reviewService = { execute: vi.fn().mockRejectedValue(new Error("falha review")) };
     const testsService = { execute: vi.fn().mockResolvedValue(testsOutput) };
