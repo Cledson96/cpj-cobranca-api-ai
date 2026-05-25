@@ -7,6 +7,7 @@ import { DocumentRoutes, type DocumentRoutesDependencies } from "@/modules/docum
 import { HealthRoutes } from "@/modules/health/routes";
 import { HistoryRoutes, type HistoryRoutesDependencies } from "@/modules/history";
 import { ReviewRoutes, type ReviewRoutesDependencies } from "@/modules/review";
+import { TestsRoutes, type TestsRoutesDependencies } from "@/modules/tests";
 import { type AppEnv, loadEnv } from "@shared";
 import {
   ErrorHandlerMiddleware,
@@ -17,6 +18,7 @@ import {
 export type AppDependencies = ComplianceRoutesDependencies &
   DocumentRoutesDependencies &
   ReviewRoutesDependencies &
+  TestsRoutesDependencies &
   HistoryRoutesDependencies;
 
 export type AppOptions = {
@@ -68,6 +70,7 @@ export class App {
     new ReviewRoutes(dependencies).register(this.app);
     new ComplianceRoutes(dependencies).register(this.app);
     new DocumentRoutes(dependencies).register(this.app);
+    new TestsRoutes(dependencies).register(this.app);
     new HistoryRoutes(dependencies).register(this.app);
   }
 

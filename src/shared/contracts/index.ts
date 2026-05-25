@@ -3,3 +3,4 @@ export * from "./document";
 export * from "./flow-types";
 export * from "./history";
 export * from "./review";
+export * from "./tests";

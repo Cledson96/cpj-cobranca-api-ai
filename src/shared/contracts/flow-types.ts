@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const flowTypeSchema = z.enum(["review", "compliance", "document"]);
+export const flowTypeSchema = z.enum(["review", "compliance", "document", "tests"]);
 export type FlowType = z.infer<typeof flowTypeSchema>;
 
 export const supportedLanguageSchema = z.enum(["typescript", "javascript", "python", "php"]);
