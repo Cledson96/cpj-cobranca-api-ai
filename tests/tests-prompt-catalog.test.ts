@@ -11,6 +11,10 @@ describe("TestsPromptCatalog", () => {
     expect(prompt).toContain("agente senior de testes");
     expect(prompt).toContain("testes de comportamento");
     expect(prompt).toContain("Nao afirme que executou testes");
-    expect(prompt).toContain("lacunas e premissas");
+    expect(prompt).toContain("test_file");
+    expect(prompt).toContain("codigo completo");
+    expect(prompt).toContain("Nao retorne apenas o nome do arquivo");
+    expect(prompt).toContain("coverage_hints");
+    expect(prompt).not.toContain("strategy_summary");
   });
 });

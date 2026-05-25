@@ -6,8 +6,8 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 
 - **Revisão de código** multi-linguagem (TypeScript, JavaScript, Python, PHP) usando agentes especialistas paralelos com roteamento por linguagem
 - **Avaliação de aderência** entre tarefa e código implementado via fluxo `compliance`
-- **Documentação técnica** gerada a partir de código via fluxo `document`
-- **Geração de testes** via fluxo `tests`, com estratégia, casos estruturados e código de teste
+- **Documentação técnica ou operacional** gerada a partir de código via fluxo `document`
+- **Geração de testes** via fluxo `tests`, com casos classificados e arquivo de teste
 - **Execução em lote** via fluxo `batch`, orquestrando `review`, `compliance`, `document` e `tests`
 - **Grafos LangGraph** — orquestração de agentes especialistas (segurança, complexidade, resource leak, error handling, naming/clarity) com agregador final
 - **Ferramentas determinísticas** — análise estática complementar (regex patterns, lint-like checks)
@@ -35,6 +35,22 @@ Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementa
 | Testes     | Vitest                              |
 | Lint       | ESLint 9 (flat config)              |
 | Container  | Docker + Compose                    |
+
+## Decisoes tecnicas
+
+- **TypeScript + Zod**: mantém contratos HTTP, respostas estruturadas dos agentes e tipos internos alinhados ao enunciado do case.
+- **Fastify**: entrega uma API leve, com validação por schema, bom desempenho e integração simples com OpenAPI/Swagger.
+- **PostgreSQL + Prisma**: persiste histórico, steps de execução, cache por hash e telemetria sem acoplar a API ao SQL bruto.
+- **LangGraph.js + LangChain.js**: modela os fluxos como grafos explícitos, separando tools determinísticas, agentes especialistas, agregação e persistência de steps.
+- **OpenRouter**: permite trocar o modelo por variável de ambiente mantendo a integração de chat e structured output.
+- **LangSmith opcional**: tracing fica disponível por configuração, sem bloquear execução local ou Docker quando não houver chave.
+- **Docker Compose**: sobe API e banco com migrations aplicadas antes do start da API.
+
+## Custo estimado
+
+O modelo padrão do `.env.example` é `openai/gpt-4o-mini`. Em 25/05/2026, a página de pricing do OpenRouter para esse modelo informa cerca de **US$0.15 por 1M tokens de entrada** e **US$0.60 por 1M tokens de saída**: [OpenRouter pricing](https://openrouter.ai/openai/gpt-4o-mini/pricing).
+
+Na prática, os exemplos em `requests/cpj-cobranca-api.http` tendem a custar centavos de dólar para uma rodada completa, assumindo códigos pequenos como os do case. O custo real aparece na telemetria persistida quando o provedor retorna `openrouterGenerationId`, tokens e `costUsd`.
 
 ## Quick Start (desenvolvimento local)
 
@@ -81,8 +97,8 @@ docker compose logs -f api
 | POST   | `/api/v1/review`    | Executa revisão de código          |
 | POST   | `/api/v1/review/stream` | Executa revisão via Server-Sent Events |
 | POST   | `/api/v1/compliance` | Avalia aderência entre tarefa e código |
-| POST   | `/api/v1/document` | Gera documentação técnica a partir de código |
-| POST   | `/api/v1/tests`    | Gera estratégia e código de testes     |
+| POST   | `/api/v1/document` | Gera documentação técnica ou operacional |
+| POST   | `/api/v1/tests`    | Gera arquivo e casos de teste     |
 | POST   | `/api/v1/batch`    | Executa varios fluxos em sequencia     |
 | GET    | `/api/v1/history`   | Lista últimas execuções            |
 | GET    | `/api/v1/history/:id` | Detalhes de uma execução         |
@@ -133,9 +149,7 @@ Resposta:
 {
   "code": "export function charge(amount: number) { return amount > 0; }",
   "language": "typescript",
-  "title": "Servico de cobranca",
-  "audience": "developer",
-  "detail_level": "standard"
+  "doc_type": "technical"
 }
 ```
 
@@ -143,18 +157,26 @@ Resposta:
 
 ```json
 {
+  "doc_type": "technical",
   "title": "Servico de cobranca",
-  "summary": "Documenta a regra principal de cobranca.",
-  "documentation": "## Servico de cobranca\n\nUse `charge` para validar cobrancas.",
-  "public_api": [
+  "description": "Valida se uma cobranca possui valor positivo.",
+  "inputs": [
     {
-      "name": "charge",
-      "kind": "function",
-      "description": "Valida se uma cobranca tem valor positivo."
+      "name": "amount",
+      "type": "number",
+      "description": "Valor da cobranca."
     }
   ],
-  "examples": ["charge(100)"],
-  "gaps": ["Nao foi possivel inferir persistencia."]
+  "outputs": [
+    {
+      "name": "return",
+      "type": "boolean",
+      "description": "Indica se o valor e positivo."
+    }
+  ],
+  "side_effects": [],
+  "usage_example": "charge(100)",
+  "notes": null
 }
 ```
 
@@ -164,9 +186,7 @@ Resposta:
 {
   "code": "export function charge(amount: number) { return amount > 0; }",
   "language": "typescript",
-  "framework": "vitest",
-  "test_goal": "Cobrir valores positivos e invalidos.",
-  "include_mocks": true
+  "test_framework": "vitest"
 }
 ```
 
@@ -175,17 +195,15 @@ Resposta:
 ```json
 {
   "framework": "vitest",
-  "strategy_summary": "Cobrir caminho feliz e valor invalido.",
+  "test_file": "import { expect, it } from 'vitest';\nimport { charge } from './charge';\n\nit('retorna true para valor positivo', () => {\n  expect(charge(100)).toBe(true);\n});",
   "test_cases": [
     {
       "name": "retorna true para valor positivo",
-      "kind": "unit",
-      "description": "Valida a regra principal.",
-      "assertions": ["espera true quando amount > 0"]
+      "type": "happy_path",
+      "description": "Valida a regra principal."
     }
   ],
-  "test_code": "import { expect, it } from 'vitest';",
-  "gaps": ["Nao foi possivel inferir dependencias externas."]
+  "coverage_hints": ["Adicionar teste para amount <= 0 quando houver regra de erro."]
 }
 ```
 
@@ -210,8 +228,7 @@ Executa itens de `review`, `compliance`, `document` e `tests` em sequencia. Use 
       "payload": {
         "code": "export function charge(amount: number) { return amount > 0; }",
         "language": "typescript",
-        "framework": "vitest",
-        "include_mocks": false
+        "test_framework": "vitest"
       }
     }
   ]
@@ -281,6 +298,14 @@ Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review`, `c
 > Variáveis LangSmith são opcionais. Para ativar tracing, defina `LANGSMITH_TRACING=true` e informe `LANGSMITH_API_KEY`.
 > OpenRouter foi escolhido por permitir alternar modelos via `OPENROUTER_DEFAULT_MODEL`. A execucao real exige `OPENROUTER_API_KEY`; custos dependem do modelo configurado.
 > Quando `WEBHOOK_CALLBACK_URL` estiver configurado, a API envia um `POST` JSON com `flow_type`, status, `execution_id`, `cache_hit` e resultado ou erro do fluxo.
+
+## O que eu faria com mais tempo
+
+- Retornar `execution_id` e `cache_hit` reais por item do `batch`, além do resumo persistido atual.
+- Adicionar streaming SSE também para `/api/v1/document`, embora o diferencial de streaming já esteja coberto em `/api/v1/review/stream`.
+- Criar uma suíte de avaliação com fixtures maiores por linguagem e snapshots de qualidade dos agentes.
+- Adicionar retry/backoff configurável para chamadas ao provedor LLM e webhook externo.
+- Oferecer modo local com Ollama para reduzir custo em ambientes de avaliação sem chave paga.
 
 ## Estrutura do Projeto
 

@@ -21,23 +21,27 @@ import type { AgentExecutionTelemetrySource } from "@/modules/agent";
 const testsInput: TestsRequest = {
   code: "export function charge(amount: number) { return amount > 0; }",
   language: "typescript",
-  framework: "vitest",
-  include_mocks: true,
+  test_framework: "vitest",
 };
 
 const testsOutput: TestsResponse = {
   framework: "vitest",
-  strategy_summary: "Cobrir caminho feliz.",
+  test_file: [
+    "import { expect, it } from 'vitest';",
+    "import { charge } from './charge';",
+    "",
+    "it('retorna true para valor positivo', () => {",
+    "  expect(charge(100)).toBe(true);",
+    "});",
+  ].join("\n"),
   test_cases: [
     {
       name: "retorna true para valor positivo",
-      kind: "unit",
+      type: "happy_path",
       description: "Valida regra principal.",
-      assertions: ["espera true quando amount > 0"],
     },
   ],
-  test_code: "import { expect, it } from 'vitest';",
-  gaps: [],
+  coverage_hints: ["Cobrir valores invalidos."],
 };
 
 class FakeTestsGraph implements TestsGraphRunner {
@@ -268,6 +272,38 @@ describe("TestsEngine com persistencia", () => {
         output: testsOutput,
       },
     ]);
+  });
+
+  it("ignora cache antigo quando output nao bate com o schema atual", async () => {
+    const graph = new FakeTestsGraph();
+    const persistence = new FakeTestsExecutionPersistence();
+    persistence.cachedRecord = {
+      id: "execution-old",
+      createdAt: "2026-05-24T12:00:00.000Z",
+      flowType: "tests",
+      status: "success",
+      inputPayload: testsInput,
+      outputPayload: {
+        framework: "jest",
+        test_file: "parcelas.service.test.ts",
+        test_cases: [],
+        coverage_hints: [],
+      },
+      durationMs: 900,
+      requestHash: "hash-old",
+      cacheHit: false,
+      sourceExecutionId: null,
+      errorMessage: null,
+    };
+    const engine = new TestsEngine(graph, persistence);
+
+    const output = await engine.execute(testsInput);
+
+    expect(output).toEqual(testsOutput);
+    expect(graph.calls).toBe(1);
+    expect(persistence.cacheHitInputs).toHaveLength(0);
+    expect(persistence.pendingInputs).toHaveLength(1);
+    expect(persistence.successInputs[0]?.outputPayload).toEqual(testsOutput);
   });
 
   it("marca execucao como falha quando o grafo quebra", async () => {

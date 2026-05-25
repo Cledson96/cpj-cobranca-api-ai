@@ -6,33 +6,31 @@ import {
 } from "@shared";
 
 describe("tests schemas", () => {
-  it("aceita payload de geracao de testes com opcoes", () => {
+  it("aceita payload de geracao de testes no contrato do case", () => {
     const result = testsRequestSchema.parse({
       code: "export function charge(amount: number) { return amount > 0; }",
       language: "typescript",
-      framework: "vitest",
-      test_goal: "Cobrir valor positivo e negativo.",
-      include_mocks: false,
+      test_framework: "vitest",
     });
 
-    expect(result.framework).toBe("vitest");
-    expect(result.include_mocks).toBe(false);
+    expect(result.test_framework).toBe("vitest");
   });
 
-  it("define framework auto e mocks habilitados por padrao", () => {
+  it("aceita frameworks citados no case", () => {
     const result = testsRequestSchema.parse({
       code: "def charge(amount): return amount > 0",
       language: "python",
+      test_framework: "mocha",
     });
 
-    expect(result.framework).toBe("auto");
-    expect(result.include_mocks).toBe(true);
+    expect(result.test_framework).toBe("mocha");
   });
 
   it("rejeita codigo vazio", () => {
     const result = testsRequestSchema.safeParse({
       code: "   ",
       language: "typescript",
+      test_framework: "jest",
     });
 
     expect(result.success).toBe(false);
@@ -48,20 +46,43 @@ describe("tests schemas", () => {
   it("valida resposta estruturada de geracao de testes", () => {
     const response = testsResponseSchema.parse({
       framework: "vitest",
-      strategy_summary: "Cobrir caminho feliz, erro de valor invalido e contrato publico.",
+      test_file: [
+        "import { expect, it } from 'vitest';",
+        "import { charge } from './charge';",
+        "",
+        "it('retorna true para valor positivo', () => {",
+        "  expect(charge(100)).toBe(true);",
+        "});",
+      ].join("\n"),
       test_cases: [
         {
           name: "retorna true para valor positivo",
-          kind: "unit",
+          type: "happy_path",
           description: "Valida a regra principal.",
-          assertions: ["espera true quando amount > 0"],
         },
       ],
-      test_code: "import { expect, it } from 'vitest';",
-      gaps: ["Nao foi possivel inferir dependencias externas."],
+      coverage_hints: ["Cobrir valores invalidos."],
     });
 
     expect(response.framework).toBe("vitest");
-    expect(response.test_cases[0]?.kind).toBe("unit");
+    expect(response.test_cases[0]?.type).toBe("happy_path");
+    expect(response.test_file).toContain("vitest");
+  });
+
+  it("rejeita test_file que contem apenas nome de arquivo", () => {
+    const result = testsResponseSchema.safeParse({
+      framework: "jest",
+      test_file: "parcelas.service.test.ts",
+      test_cases: [
+        {
+          name: "calcula juros",
+          type: "happy_path",
+          description: "Valida calculo principal.",
+        },
+      ],
+      coverage_hints: [],
+    });
+
+    expect(result.success).toBe(false);
   });
 });

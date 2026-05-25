@@ -6,24 +6,27 @@ import { createTestEnv } from "./support/test-env";
 const validPayload: TestsRequest = {
   code: "export function charge(amount: number) { return amount > 0; }",
   language: "typescript",
-  framework: "vitest",
-  test_goal: "Cobrir valores positivos e invalidos.",
-  include_mocks: true,
+  test_framework: "vitest",
 };
 
 const testsResponse: TestsResponse = {
   framework: "vitest",
-  strategy_summary: "Cobrir caminho feliz e valor invalido.",
+  test_file: [
+    "import { expect, it } from 'vitest';",
+    "import { charge } from './charge';",
+    "",
+    "it('retorna true para valor positivo', () => {",
+    "  expect(charge(100)).toBe(true);",
+    "});",
+  ].join("\n"),
   test_cases: [
     {
       name: "retorna true para valor positivo",
-      kind: "unit",
+      type: "happy_path",
       description: "Valida regra principal.",
-      assertions: ["espera true quando amount > 0"],
     },
   ],
-  test_code: "import { expect, it } from 'vitest';",
-  gaps: [],
+  coverage_hints: ["Cobrir valores invalidos."],
 };
 
 function createApp() {
@@ -68,6 +71,7 @@ describe("POST /api/v1/tests", () => {
       payload: {
         code: "",
         language: "typescript",
+        test_framework: "vitest",
       },
     });
 

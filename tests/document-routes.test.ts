@@ -6,24 +6,30 @@ import { createTestEnv } from "./support/test-env";
 const validPayload: DocumentRequest = {
   code: "export function charge(amount: number) { return amount > 0; }",
   language: "typescript",
-  title: "Servico de cobranca",
-  audience: "developer",
-  detail_level: "standard",
+  doc_type: "technical",
 };
 
 const documentResponse: DocumentResponse = {
+  doc_type: "technical",
   title: "Servico de cobranca",
-  summary: "Documenta a regra principal de cobranca.",
-  documentation: "## Servico de cobranca\n\nUse `charge` para validar cobrancas.",
-  public_api: [
+  description: "Valida se uma cobranca tem valor positivo.",
+  inputs: [
     {
-      name: "charge",
-      kind: "function",
-      description: "Valida se uma cobranca tem valor positivo.",
+      name: "amount",
+      type: "number",
+      description: "Valor da cobranca.",
     },
   ],
-  examples: ["charge(100)"],
-  gaps: [],
+  outputs: [
+    {
+      name: "return",
+      type: "boolean",
+      description: "Resultado da validacao.",
+    },
+  ],
+  side_effects: [],
+  usage_example: "charge(100)",
+  notes: null,
 };
 
 function createApp() {
@@ -68,6 +74,7 @@ describe("POST /api/v1/document", () => {
       payload: {
         code: "",
         language: "typescript",
+        doc_type: "technical",
       },
     });
 

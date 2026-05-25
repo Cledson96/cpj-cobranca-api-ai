@@ -14,9 +14,7 @@ describe("DeterministicDocumentToolsRunner", () => {
         "export class BillingPolicy {}",
       ].join("\n"),
       language: "typescript",
-      title: "Cobranca",
-      audience: "developer",
-      detail_level: "standard",
+      doc_type: "technical",
     });
 
     expect(result.publicApiCandidates).toEqual([
@@ -44,6 +42,7 @@ describe("DeterministicDocumentToolsRunner", () => {
         "}",
       ].join("\n"),
       language: "typescript",
+      doc_type: "technical",
     });
 
     expect(result.findings).toContainEqual({

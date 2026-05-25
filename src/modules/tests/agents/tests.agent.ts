@@ -24,15 +24,14 @@ export class TestsAgent extends BaseSpecialistAgent<TestsResponse, TestsAnalysis
   protected buildSystemPrompt(context: TestsAnalysisContext): string {
     return this.promptCatalog.getAgentSystemPrompt([
       `Linguagem: ${context.input.language}`,
-      `Framework: ${context.input.framework ?? "auto"}`,
-      `Incluir mocks: ${context.input.include_mocks ?? true}`,
+      `Framework: ${context.input.test_framework}`,
     ].join("\n"));
   }
 
   protected buildUserPrompt(context: TestsAnalysisContext): string {
     return JSON.stringify(
       {
-        objetivo_de_teste: context.input.test_goal,
+        test_framework: context.input.test_framework,
         codigo: context.input.code,
         comportamentos_candidatos: context.toolResult.behaviorCandidates,
         sinais_deterministicos: context.toolResult.findings,

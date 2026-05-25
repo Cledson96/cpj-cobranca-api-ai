@@ -14,4 +14,13 @@ describe("requests manuais", () => {
     expect(requests).toContain("/api/v1/batch");
     expect(requests).toContain("/api/v1/history");
   });
+
+  it("usa os campos do contrato original do case para document e tests", () => {
+    expect(requests).toContain('"doc_type"');
+    expect(requests).not.toContain('"audience"');
+    expect(requests).not.toContain('"detail_level"');
+
+    expect(requests).toContain('"test_framework"');
+    expect(requests).not.toContain('"include_mocks"');
+  });
 });

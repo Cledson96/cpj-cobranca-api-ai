@@ -11,23 +11,27 @@ const testsInput: TestsRequest = {
     "}",
   ].join("\n"),
   language: "typescript",
-  framework: "vitest",
-  include_mocks: true,
+  test_framework: "vitest",
 };
 
 const testsOutput: TestsResponse = {
   framework: "vitest",
-  strategy_summary: "Cobrir caminho feliz e erro de valor invalido.",
+  test_file: [
+    "import { expect, it } from 'vitest';",
+    "import { charge } from './charge';",
+    "",
+    "it('retorna true para valor positivo', () => {",
+    "  expect(charge(100)).toBe(true);",
+    "});",
+  ].join("\n"),
   test_cases: [
     {
       name: "retorna true para valor positivo",
-      kind: "unit",
+      type: "happy_path",
       description: "Valida caminho feliz.",
-      assertions: ["espera true quando amount > 0"],
     },
   ],
-  test_code: "import { expect, it } from 'vitest';",
-  gaps: [],
+  coverage_hints: ["Cobrir amount <= 0."],
 };
 
 class FakeTestsAgent implements TestsAgentLike {

@@ -2,9 +2,9 @@ import { documentRequestSchema, documentResponseSchema } from "@shared";
 import { toOpenApiSchema } from "@/infrastructure/openapi";
 
 export const documentRouteDocs = {
-  summary: "Gera documentacao tecnica a partir de codigo",
+  summary: "Gera documentacao tecnica ou operacional a partir de codigo",
   description:
-    "Analisa codigo-fonte e retorna documentacao estruturada em Markdown, API publica, exemplos e lacunas de inferencia.",
+    "Analisa codigo-fonte e retorna documentacao estruturada com entradas, saidas, efeitos colaterais, exemplo de uso e observacoes.",
   tags: ["Document"],
   body: toOpenApiSchema(documentRequestSchema),
   response: {

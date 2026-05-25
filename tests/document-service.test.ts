@@ -5,15 +5,18 @@ import type { DocumentRequest, DocumentResponse } from "@shared";
 const documentInput: DocumentRequest = {
   code: "export function charge(amount: number) { return amount > 0; }",
   language: "typescript",
+  doc_type: "technical",
 };
 
 const documentOutput: DocumentResponse = {
+  doc_type: "technical",
   title: "Cobranca",
-  summary: "Documenta cobranca.",
-  documentation: "## Cobranca",
-  public_api: [],
-  examples: [],
-  gaps: [],
+  description: "Documenta cobranca.",
+  inputs: [],
+  outputs: [],
+  side_effects: [],
+  usage_example: "charge(100)",
+  notes: null,
 };
 
 describe("DefaultDocumentService", () => {

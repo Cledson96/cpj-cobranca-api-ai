@@ -21,7 +21,7 @@ describe("batch schemas", () => {
           payload: {
             code: "export function sum(a: number, b: number) { return a + b; }",
             language: "typescript",
-            framework: "vitest",
+            test_framework: "vitest",
           },
         },
       ],
@@ -42,6 +42,7 @@ describe("batch schemas", () => {
           payload: {
             code: "export function charge(amount: number) { return amount > 0; }",
             language: "typescript",
+            doc_type: "technical",
           },
         },
       ],

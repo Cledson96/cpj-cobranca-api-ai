@@ -99,7 +99,7 @@ export class DocumentFlowGraph implements DocumentGraphRunner {
       kind: "tool",
       inputPayload: {
         language: state.input.language,
-        title: state.input.title,
+        doc_type: state.input.doc_type,
       },
       outputPayload: output,
       startedAt,

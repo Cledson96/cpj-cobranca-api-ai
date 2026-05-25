@@ -5,14 +5,21 @@ import type { TestsRequest, TestsResponse } from "@shared";
 const testsInput: TestsRequest = {
   code: "export function charge(amount: number) { return amount > 0; }",
   language: "typescript",
+  test_framework: "vitest",
 };
 
 const testsOutput: TestsResponse = {
   framework: "vitest",
-  strategy_summary: "Cobrir caminho feliz.",
+  test_file: [
+    "import { expect, it } from 'vitest';",
+    "import { charge } from './charge';",
+    "",
+    "it('retorna true para valor positivo', () => {",
+    "  expect(charge(100)).toBe(true);",
+    "});",
+  ].join("\n"),
   test_cases: [],
-  test_code: "import { it } from 'vitest';",
-  gaps: [],
+  coverage_hints: [],
 };
 
 describe("DefaultTestsService", () => {

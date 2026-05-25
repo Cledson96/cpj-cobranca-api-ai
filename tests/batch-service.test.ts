@@ -12,10 +12,16 @@ const reviewOutput = {
 
 const testsOutput = {
   framework: "vitest",
-  strategy_summary: "Cobrir caminho feliz.",
+  test_file: [
+    "import { expect, it } from 'vitest';",
+    "import { sum } from './sum';",
+    "",
+    "it('soma dois numeros', () => {",
+    "  expect(sum(1, 2)).toBe(3);",
+    "});",
+  ].join("\n"),
   test_cases: [],
-  test_code: "import { it } from 'vitest';",
-  gaps: [],
+  coverage_hints: [],
 };
 
 const batchInput: BatchRequest = {
@@ -34,7 +40,7 @@ const batchInput: BatchRequest = {
       payload: {
         code: "export function sum(a: number, b: number) { return a + b; }",
         language: "typescript",
-        framework: "vitest",
+        test_framework: "vitest",
       },
     },
   ],

@@ -21,24 +21,30 @@ import type { AgentExecutionTelemetrySource } from "@/modules/agent";
 const documentInput: DocumentRequest = {
   code: "export function charge(amount: number) { return amount > 0; }",
   language: "typescript",
-  title: "Cobranca",
-  audience: "developer",
-  detail_level: "standard",
+  doc_type: "technical",
 };
 
 const documentOutput: DocumentResponse = {
+  doc_type: "technical",
   title: "Cobranca",
-  summary: "Documenta a regra principal de cobranca.",
-  documentation: "## Cobranca\n\nUse `charge` para validar cobrancas.",
-  public_api: [
+  description: "Valida se uma cobranca tem valor positivo.",
+  inputs: [
     {
-      name: "charge",
-      kind: "function",
-      description: "Valida se uma cobranca tem valor positivo.",
+      name: "amount",
+      type: "number",
+      description: "Valor da cobranca.",
     },
   ],
-  examples: ["charge(100)"],
-  gaps: [],
+  outputs: [
+    {
+      name: "return",
+      type: "boolean",
+      description: "Resultado da validacao.",
+    },
+  ],
+  side_effects: [],
+  usage_example: "charge(100)",
+  notes: null,
 };
 
 class FakeDocumentGraph implements DocumentGraphRunner {
@@ -269,6 +275,40 @@ describe("DocumentEngine com persistencia", () => {
         output: documentOutput,
       },
     ]);
+  });
+
+  it("ignora cache antigo quando output nao bate com o schema atual", async () => {
+    const graph = new FakeDocumentGraph();
+    const persistence = new FakeDocumentExecutionPersistence();
+    persistence.cachedRecord = {
+      id: "execution-old",
+      createdAt: "2026-05-24T12:00:00.000Z",
+      flowType: "document",
+      status: "success",
+      inputPayload: documentInput,
+      outputPayload: {
+        title: "Cobranca",
+        summary: "Formato antigo",
+        documentation: "## Cobranca",
+        public_api: [],
+        examples: [],
+        gaps: [],
+      },
+      durationMs: 900,
+      requestHash: "hash-old",
+      cacheHit: false,
+      sourceExecutionId: null,
+      errorMessage: null,
+    };
+    const engine = new DocumentEngine(graph, persistence);
+
+    const output = await engine.execute(documentInput);
+
+    expect(output).toEqual(documentOutput);
+    expect(graph.calls).toBe(1);
+    expect(persistence.cacheHitInputs).toHaveLength(0);
+    expect(persistence.pendingInputs).toHaveLength(1);
+    expect(persistence.successInputs[0]?.outputPayload).toEqual(documentOutput);
   });
 
   it("marca execucao como falha quando o grafo quebra", async () => {

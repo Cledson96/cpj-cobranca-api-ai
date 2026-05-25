@@ -99,7 +99,7 @@ export class TestsFlowGraph implements TestsGraphRunner {
       kind: "tool",
       inputPayload: {
         language: state.input.language,
-        framework: state.input.framework,
+        test_framework: state.input.test_framework,
       },
       outputPayload: output,
       startedAt,

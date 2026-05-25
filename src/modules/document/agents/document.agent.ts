@@ -24,15 +24,14 @@ export class DocumentAgent extends BaseSpecialistAgent<DocumentResponse, Documen
   protected buildSystemPrompt(context: DocumentAnalysisContext): string {
     return this.promptCatalog.getAgentSystemPrompt([
       `Linguagem: ${context.input.language}`,
-      `Publico: ${context.input.audience ?? "developer"}`,
-      `Nivel de detalhe: ${context.input.detail_level ?? "standard"}`,
+      `Tipo de documentacao: ${context.input.doc_type}`,
     ].join("\n"));
   }
 
   protected buildUserPrompt(context: DocumentAnalysisContext): string {
     return JSON.stringify(
       {
-        titulo: context.input.title,
+        doc_type: context.input.doc_type,
         codigo: context.input.code,
         api_publica_detectada: context.toolResult.publicApiCandidates,
         sinais_deterministicos: context.toolResult.findings,

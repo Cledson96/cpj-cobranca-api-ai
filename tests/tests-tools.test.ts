@@ -14,8 +14,7 @@ describe("DeterministicTestsToolsRunner", () => {
         "}",
       ].join("\n"),
       language: "typescript",
-      framework: "vitest",
-      include_mocks: true,
+      test_framework: "vitest",
     });
 
     expect(result.behaviorCandidates).toEqual([
@@ -40,6 +39,7 @@ describe("DeterministicTestsToolsRunner", () => {
         "}",
       ].join("\n"),
       language: "typescript",
+      test_framework: "vitest",
     });
 
     expect(result.findings).toContainEqual({

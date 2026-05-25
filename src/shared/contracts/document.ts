@@ -3,34 +3,35 @@ import { supportedLanguageSchema } from "./flow-types";
 
 const nonEmptyString = () => z.string().trim().min(1);
 
-export const documentAudienceSchema = z.enum(["developer", "support", "business"]);
-export type DocumentAudience = z.infer<typeof documentAudienceSchema>;
-
-export const documentDetailLevelSchema = z.enum(["summary", "standard", "detailed"]);
-export type DocumentDetailLevel = z.infer<typeof documentDetailLevelSchema>;
+export const documentDocTypeSchema = z.enum(["technical", "operational"]);
+export type DocumentDocType = z.infer<typeof documentDocTypeSchema>;
 
 export const documentRequestSchema = z.object({
   code: nonEmptyString(),
   language: supportedLanguageSchema,
-  title: z.string().trim().optional(),
-  audience: documentAudienceSchema.default("developer"),
-  detail_level: documentDetailLevelSchema.default("standard"),
+  doc_type: documentDocTypeSchema,
 });
-export type DocumentRequest = z.input<typeof documentRequestSchema>;
+export type DocumentRequest = z.infer<typeof documentRequestSchema>;
 
-export const documentPublicApiItemSchema = z.object({
+const createDocumentIoItemSchema = () => z.object({
   name: nonEmptyString(),
-  kind: nonEmptyString(),
+  type: nonEmptyString(),
   description: nonEmptyString(),
 });
-export type DocumentPublicApiItem = z.infer<typeof documentPublicApiItemSchema>;
+
+export const documentInputItemSchema = createDocumentIoItemSchema();
+export const documentOutputItemSchema = createDocumentIoItemSchema();
+export const documentIoItemSchema = createDocumentIoItemSchema();
+export type DocumentIoItem = z.infer<typeof documentIoItemSchema>;
 
 export const documentResponseSchema = z.object({
+  doc_type: documentDocTypeSchema,
   title: nonEmptyString(),
-  summary: nonEmptyString(),
-  documentation: nonEmptyString(),
-  public_api: z.array(documentPublicApiItemSchema),
-  examples: z.array(nonEmptyString()),
-  gaps: z.array(nonEmptyString()),
+  description: nonEmptyString(),
+  inputs: z.array(documentInputItemSchema),
+  outputs: z.array(documentOutputItemSchema),
+  side_effects: z.array(nonEmptyString()),
+  usage_example: nonEmptyString(),
+  notes: z.string().trim().min(1).nullable(),
 });
 export type DocumentResponse = z.infer<typeof documentResponseSchema>;

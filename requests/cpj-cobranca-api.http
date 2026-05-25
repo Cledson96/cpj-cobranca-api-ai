@@ -78,9 +78,7 @@ Content-Type: application/json
 {
   "code": "export async function chargeCustomer(customerId: string, amount: number) { if (amount <= 0) throw new Error('invalid amount'); await repository.save({ customerId, amount }); return { approved: true }; }",
   "language": "typescript",
-  "title": "Servico de cobranca",
-  "audience": "developer",
-  "detail_level": "standard"
+  "doc_type": "technical"
 }
 
 ### -----------------------
@@ -92,9 +90,7 @@ Content-Type: application/json
 {
   "code": "export function charge(amount: number) { if (amount <= 0) throw new Error('invalid amount'); return amount > 0; }",
   "language": "typescript",
-  "framework": "vitest",
-  "test_goal": "Cobrir valor positivo e erro de valor invalido.",
-  "include_mocks": false
+  "test_framework": "vitest"
 }
 
 ### -----------------------
@@ -112,9 +108,7 @@ Content-Type: application/json
       "payload": {
         "code": "export async function chargeCustomer(customerId: string, amount: number) { if (amount <= 0) throw new Error('invalid amount'); await repository.save({ customerId, amount }); return { approved: true }; }",
         "language": "typescript",
-        "title": "Servico de cobranca",
-        "audience": "developer",
-        "detail_level": "standard"
+        "doc_type": "technical"
       }
     },
     {
@@ -122,9 +116,7 @@ Content-Type: application/json
       "payload": {
         "code": "export function charge(amount: number) { if (amount <= 0) throw new Error('invalid amount'); return amount > 0; }",
         "language": "typescript",
-        "framework": "vitest",
-        "test_goal": "Cobrir valor positivo e erro de valor invalido.",
-        "include_mocks": false
+        "test_framework": "vitest"
       }
     }
   ]

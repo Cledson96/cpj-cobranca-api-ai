@@ -16,7 +16,7 @@ import type {
   RecordReviewExecutionTelemetryInput,
   ReviewExecutionRecord,
 } from "@/modules/executions";
-import type { AppEnv, DocumentRequest, DocumentResponse } from "@shared";
+import { documentResponseSchema, type AppEnv, type DocumentRequest, type DocumentResponse } from "@shared";
 import { createPayloadHash, loadEnv } from "@shared";
 import { DocumentFlowGraph, type DocumentGraphRunner, type DocumentStepRecorder } from "../graphs";
 import {
@@ -80,33 +80,36 @@ export class DocumentEngine extends BaseAgentEngine<DocumentRequest, DocumentRes
     try {
       const cached = await this.persistence.findSuccessByHash(hash);
       if (cached && cached.outputPayload) {
-        const durationMs = dayjs().valueOf() - startedAt;
-        const execution = await this.persistence.createCacheHit({
-          inputPayload: input,
-          requestHash: hash,
-          sourceExecutionId: cached.id,
-          outputPayload: cached.outputPayload as DocumentResponse,
-          durationMs,
-        });
+        const cachedOutput = documentResponseSchema.safeParse(cached.outputPayload);
+        if (cachedOutput.success) {
+          const durationMs = dayjs().valueOf() - startedAt;
+          const execution = await this.persistence.createCacheHit({
+            inputPayload: input,
+            requestHash: hash,
+            sourceExecutionId: cached.id,
+            outputPayload: cachedOutput.data,
+            durationMs,
+          });
 
-        await this.persistence.recordStep({
-          executionId: execution.id,
-          nodeName: "cache_lookup",
-          kind: "cache",
-          status: "success",
-          inputPayload: { requestHash: hash },
-          outputPayload: { cacheHit: true, sourceExecutionId: cached.id },
-          durationMs,
-        });
+          await this.persistence.recordStep({
+            executionId: execution.id,
+            nodeName: "cache_lookup",
+            kind: "cache",
+            status: "success",
+            inputPayload: { requestHash: hash },
+            outputPayload: { cacheHit: true, sourceExecutionId: cached.id },
+            durationMs,
+          });
 
-        await this.notifyWebhook({
-          executionId: execution.id,
-          status: "success",
-          cacheHit: true,
-          output: cached.outputPayload as DocumentResponse,
-        });
+          await this.notifyWebhook({
+            executionId: execution.id,
+            status: "success",
+            cacheHit: true,
+            output: cachedOutput.data,
+          });
 
-        return cached.outputPayload as DocumentResponse;
+          return cachedOutput.data;
+        }
       }
     } catch {
       // Falhas no cache nao impedem o fluxo principal

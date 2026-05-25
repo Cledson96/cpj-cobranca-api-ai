@@ -4,7 +4,7 @@ import { toOpenApiSchema } from "@/infrastructure/openapi";
 export const testsRouteDocs = {
   summary: "Gera sugestoes e codigo de testes para um codigo",
   description:
-    "Analisa codigo-fonte e retorna estrategia, casos de teste, codigo de teste gerado e lacunas de inferencia.",
+    "Analisa codigo-fonte e retorna arquivo de teste, casos classificados e dicas de cobertura.",
   tags: ["Tests"],
   body: toOpenApiSchema(testsRequestSchema),
   response: {

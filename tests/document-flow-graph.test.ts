@@ -11,24 +11,30 @@ const documentInput: DocumentRequest = {
     "}",
   ].join("\n"),
   language: "typescript",
-  title: "Cobranca",
-  audience: "developer",
-  detail_level: "standard",
+  doc_type: "technical",
 };
 
 const documentOutput: DocumentResponse = {
+  doc_type: "technical",
   title: "Cobranca",
-  summary: "Documenta a funcao de cobranca.",
-  documentation: "## Cobranca\n\nA funcao `chargeCustomer` persiste uma tentativa de cobranca.",
-  public_api: [
+  description: "A funcao chargeCustomer persiste uma tentativa de cobranca.",
+  inputs: [
     {
-      name: "chargeCustomer",
-      kind: "function",
-      description: "Persiste a tentativa de cobranca e retorna aprovacao.",
+      name: "customerId",
+      type: "string",
+      description: "Identificador do cliente.",
     },
   ],
-  examples: ["await chargeCustomer('cust-1', 100)"],
-  gaps: ["Nao foi possivel inferir validacoes externas."],
+  outputs: [
+    {
+      name: "return",
+      type: "object",
+      description: "Objeto com aprovacao.",
+    },
+  ],
+  side_effects: ["Persistencia via repository.save."],
+  usage_example: "await chargeCustomer('cust-1', 100)",
+  notes: "Nao foi possivel inferir validacoes externas.",
 };
 
 class FakeDocumentAgent implements DocumentAgentLike {

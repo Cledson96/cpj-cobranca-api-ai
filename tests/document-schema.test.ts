@@ -6,34 +6,31 @@ import {
 } from "@shared";
 
 describe("document schemas", () => {
-  it("aceita payload de documentacao com opcoes editoriais", () => {
+  it("aceita payload de documentacao no contrato do case", () => {
     const result = documentRequestSchema.parse({
       code: "export function charge(amount: number) { return amount > 0; }",
       language: "typescript",
-      title: "Servico de cobranca",
-      audience: "developer",
-      detail_level: "detailed",
+      doc_type: "technical",
     });
 
-    expect(result.title).toBe("Servico de cobranca");
-    expect(result.audience).toBe("developer");
-    expect(result.detail_level).toBe("detailed");
+    expect(result.doc_type).toBe("technical");
   });
 
-  it("define valores padrao para audiencia e nivel de detalhe", () => {
+  it("aceita documentacao operacional para squads e produto", () => {
     const result = documentRequestSchema.parse({
       code: "def charge(amount): return amount > 0",
       language: "python",
+      doc_type: "operational",
     });
 
-    expect(result.audience).toBe("developer");
-    expect(result.detail_level).toBe("standard");
+    expect(result.doc_type).toBe("operational");
   });
 
   it("rejeita codigo vazio", () => {
     const result = documentRequestSchema.safeParse({
       code: "   ",
       language: "typescript",
+      doc_type: "technical",
     });
 
     expect(result.success).toBe(false);
@@ -47,21 +44,30 @@ describe("document schemas", () => {
 
   it("valida resposta estruturada de documentacao", () => {
     const response = documentResponseSchema.parse({
+      doc_type: "technical",
       title: "Servico de cobranca",
-      summary: "Documenta a regra principal de cobranca.",
-      documentation: "## Servico de cobranca\n\nUse `charge` para validar cobrancas.",
-      public_api: [
+      description: "Valida se uma cobranca tem valor positivo.",
+      inputs: [
         {
-          name: "charge",
-          kind: "function",
-          description: "Valida se uma cobranca tem valor positivo.",
+          name: "amount",
+          type: "number",
+          description: "Valor da cobranca.",
         },
       ],
-      examples: ["charge(100)"],
-      gaps: ["Nao foi possivel inferir persistencia."],
+      outputs: [
+        {
+          name: "return",
+          type: "boolean",
+          description: "Indica se o valor e positivo.",
+        },
+      ],
+      side_effects: [],
+      usage_example: "charge(100)",
+      notes: "Nao foi possivel inferir persistencia.",
     });
 
-    expect(response.public_api[0]?.name).toBe("charge");
-    expect(response.documentation).toContain("Servico de cobranca");
+    expect(response.doc_type).toBe("technical");
+    expect(response.inputs[0]?.name).toBe("amount");
+    expect(response.outputs[0]?.type).toBe("boolean");
   });
 });

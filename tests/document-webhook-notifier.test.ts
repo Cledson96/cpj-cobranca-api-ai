@@ -12,12 +12,14 @@ describe("HttpDocumentWebhookNotifier", () => {
       status: "success",
       cache_hit: false,
       output: {
+        doc_type: "technical",
         title: "Cobranca",
-        summary: "Documenta cobranca.",
-        documentation: "## Cobranca",
-        public_api: [],
-        examples: [],
-        gaps: [],
+        description: "Documenta a regra de cobranca.",
+        inputs: [],
+        outputs: [],
+        side_effects: [],
+        usage_example: "charge(100)",
+        notes: null,
       },
     });
 
