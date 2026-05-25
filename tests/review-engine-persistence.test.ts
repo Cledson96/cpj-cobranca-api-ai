@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ReviewEngine, type ReviewExecutionPersistence } from "@/modules/review/engines";
+import {
+  ReviewEngine,
+  type ReviewExecutionPersistence,
+  type ReviewWebhookNotifier,
+  type ReviewWebhookPayload,
+} from "@/modules/review/engines";
 import type { ReviewGraphRunContext, ReviewGraphRunner } from "@/modules/review/graphs";
 import type { ReviewRequest, ReviewResponse } from "@shared";
 import type {
@@ -166,6 +171,19 @@ class FakeTelemetrySource implements AgentExecutionTelemetrySource {
   }
 }
 
+class FakeReviewWebhookNotifier implements ReviewWebhookNotifier {
+  readonly payloads: ReviewWebhookPayload[] = [];
+
+  constructor(private readonly failWith?: Error) {}
+
+  async notify(payload: ReviewWebhookPayload): Promise<void> {
+    this.payloads.push(payload);
+    if (this.failWith) {
+      throw this.failWith;
+    }
+  }
+}
+
 describe("ReviewEngine com persistencia", () => {
   it("cria execucao pendente, envia contexto ao grafo e marca sucesso", async () => {
     const graph = new FakeReviewGraph();
@@ -204,6 +222,52 @@ describe("ReviewEngine com persistencia", () => {
     expect(persistence.failedInputs).toHaveLength(0);
   });
 
+  it("envia webhook de sucesso e registra step quando callback esta configurado", async () => {
+    const graph = new FakeReviewGraph();
+    const persistence = new FakeReviewExecutionPersistence();
+    const webhookNotifier = new FakeReviewWebhookNotifier();
+    const engine = new ReviewEngine(graph, persistence, undefined, webhookNotifier);
+
+    await engine.execute(reviewInput);
+
+    expect(webhookNotifier.payloads).toEqual([
+      {
+        flow_type: "review",
+        execution_id: "execution-1",
+        status: "success",
+        cache_hit: false,
+        output: reviewOutput,
+      },
+    ]);
+
+    const webhookStep = persistence.stepInputs.find((step) => step.nodeName === "webhook_callback");
+    expect(webhookStep).toMatchObject({
+      executionId: "execution-1",
+      kind: "webhook",
+      status: "success",
+      inputPayload: { status: "success", cacheHit: false },
+      outputPayload: { delivered: true },
+    });
+  });
+
+  it("registra falha do webhook sem quebrar resposta principal", async () => {
+    const graph = new FakeReviewGraph();
+    const persistence = new FakeReviewExecutionPersistence();
+    const webhookNotifier = new FakeReviewWebhookNotifier(new Error("callback indisponivel"));
+    const engine = new ReviewEngine(graph, persistence, undefined, webhookNotifier);
+
+    await expect(engine.execute(reviewInput)).resolves.toEqual(reviewOutput);
+
+    const webhookStep = persistence.stepInputs.find((step) => step.nodeName === "webhook_callback");
+    expect(webhookStep).toMatchObject({
+      executionId: "execution-1",
+      kind: "webhook",
+      status: "failed",
+      inputPayload: { status: "success", cacheHit: false },
+      errorMessage: "callback indisponivel",
+    });
+  });
+
   it("marca execucao como falha quando o grafo quebra", async () => {
     const graph = new FailingReviewGraph();
     const persistence = new FakeReviewExecutionPersistence();
@@ -217,6 +281,25 @@ describe("ReviewEngine com persistencia", () => {
     expect(persistence.failedInputs[0]?.id).toBe("execution-1");
     expect(persistence.failedInputs[0]?.errorMessage).toBe("falha no llm");
     expect(persistence.failedInputs[0]?.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("envia webhook de falha e preserva o erro original", async () => {
+    const graph = new FailingReviewGraph();
+    const persistence = new FakeReviewExecutionPersistence();
+    const webhookNotifier = new FakeReviewWebhookNotifier();
+    const engine = new ReviewEngine(graph, persistence, undefined, webhookNotifier);
+
+    await expect(engine.execute(reviewInput)).rejects.toThrow("falha no llm");
+
+    expect(webhookNotifier.payloads).toEqual([
+      {
+        flow_type: "review",
+        execution_id: "execution-1",
+        status: "failed",
+        cache_hit: false,
+        error_message: "falha no llm",
+      },
+    ]);
   });
 
   it("ignora a execucao do grafo e retorna payload de sucesso em caso de cache hit", async () => {
@@ -258,5 +341,38 @@ describe("ReviewEngine com persistencia", () => {
 
     expect(persistence.pendingInputs).toHaveLength(0);
     expect(persistence.successInputs).toHaveLength(0);
+  });
+
+  it("envia webhook de sucesso quando retorna cache hit", async () => {
+    const graph = new FakeReviewGraph();
+    const persistence = new FakeReviewExecutionPersistence();
+    const webhookNotifier = new FakeReviewWebhookNotifier();
+
+    persistence.cachedRecord = {
+      id: "execution-original",
+      createdAt: "2026-05-24T12:00:00.000Z",
+      flowType: "review",
+      status: "success",
+      inputPayload: reviewInput,
+      outputPayload: reviewOutput,
+      durationMs: 1200,
+      requestHash: "hash-original",
+      cacheHit: false,
+      sourceExecutionId: null,
+      errorMessage: null,
+    };
+
+    const engine = new ReviewEngine(graph, persistence, undefined, webhookNotifier);
+    await engine.execute(reviewInput);
+
+    expect(webhookNotifier.payloads).toEqual([
+      {
+        flow_type: "review",
+        execution_id: "execution-cache-1",
+        status: "success",
+        cache_hit: true,
+        output: reviewOutput,
+      },
+    ]);
   });
 });

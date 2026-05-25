@@ -31,4 +31,13 @@ describe("Env", () => {
     expect(env.LANGSMITH_TRACING).toBe(true);
     expect(env.OPENROUTER_FETCH_GENERATION_STATS).toBe(false);
   });
+
+  it("trata WEBHOOK_CALLBACK_URL vazia como ausente", () => {
+    const env = new Env({
+      ...createTestEnvSource(),
+      WEBHOOK_CALLBACK_URL: "",
+    }).values;
+
+    expect(env.WEBHOOK_CALLBACK_URL).toBeUndefined();
+  });
 });

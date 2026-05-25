@@ -8,6 +8,11 @@ const booleanString = z
   .default("false")
   .transform((value) => value === "true");
 
+const optionalUrl = z.preprocess(
+  (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.string().trim().url().optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.string().trim().min(1).default("0.0.0.0"),
@@ -30,7 +35,7 @@ const envSchema = z.object({
   LANGSMITH_TRACING: booleanString,
   LANGSMITH_API_KEY: z.string().trim().default(""),
   LANGSMITH_PROJECT: z.string().trim().min(1).default("cpj-cobranca-api-ai"),
-  WEBHOOK_CALLBACK_URL: z.string().trim().url().optional(),
+  WEBHOOK_CALLBACK_URL: optionalUrl,
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

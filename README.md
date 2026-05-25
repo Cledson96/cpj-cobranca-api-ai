@@ -12,10 +12,11 @@ API do case técnico CPJ-Cobrança para revisão automatizada de código usando 
 - **OpenAPI/Swagger UI** — docs interativos em `/docs`
 - **OpenRouter** — provedor LLM multi-modelo
 - **LangSmith** — tracing opcional (desligado por padrão)
+- **Webhook opcional** — callback ao concluir ou falhar uma execucao de review
 
 ## Estado Atual
 
-O fluxo `review` esta implementado com endpoint HTTP, streaming SSE, cache por hash, historico persistido, telemetria do OpenRouter e Docker Compose. Os fluxos `compliance`, `document`, `tests`, `batch` e webhook ainda estao fora do escopo entregue nesta fase.
+O fluxo `review` esta implementado com endpoint HTTP, streaming SSE, cache por hash, webhook opcional, historico persistido, telemetria do OpenRouter e Docker Compose. Os fluxos `compliance`, `document`, `tests` e `batch` ainda estao fora do escopo entregue nesta fase.
 
 ## Stack
 
@@ -94,6 +95,26 @@ docker compose logs -f api
 
 Usa o mesmo payload do `/api/v1/review` e responde como `text/event-stream`, emitindo eventos `started`, `step`, `result`, `error` e `done`.
 
+### Webhook opcional
+
+Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de review envia um `POST` JSON para a URL ao finalizar com sucesso ou falha. Falhas no callback sao registradas no historico como step `webhook_callback`, mas nao alteram a resposta principal.
+
+```json
+{
+  "flow_type": "review",
+  "execution_id": "execution-id",
+  "status": "success",
+  "cache_hit": false,
+  "output": {
+    "overall_quality": "good",
+    "score": 9,
+    "issues": [],
+    "positives": ["Codigo simples e legivel."],
+    "summary": "Sem problemas relevantes."
+  }
+}
+```
+
 ## Ambiente
 
 | Variável                     | Exemplo                                           | Obrigatório |
@@ -106,9 +127,11 @@ Usa o mesmo payload do `/api/v1/review` e responde como `text/event-stream`, emi
 | `LANGSMITH_TRACING`          | `false`                                           | ❌          |
 | `LANGSMITH_API_KEY`          | `lsv2_...`                                        | ❌          |
 | `LANGSMITH_PROJECT`          | `cpj-cobranca-api-ai`                             | ❌          |
+| `WEBHOOK_CALLBACK_URL`       | `https://example.com/webhook/cpj-cobranca`        | ❌          |
 
 > Variáveis LangSmith são opcionais. Para ativar tracing, defina `LANGSMITH_TRACING=true` e informe `LANGSMITH_API_KEY`.
 > OpenRouter foi escolhido por permitir alternar modelos via `OPENROUTER_DEFAULT_MODEL`. A execucao real exige `OPENROUTER_API_KEY`; custos dependem do modelo configurado.
+> Quando `WEBHOOK_CALLBACK_URL` estiver configurado, a API envia um `POST` JSON com status, `execution_id`, `cache_hit` e resultado ou erro do review.
 
 ## Estrutura do Projeto
 

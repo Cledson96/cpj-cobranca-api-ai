@@ -159,8 +159,6 @@ export class StreamingReviewExecutionPersistence implements ReviewExecutionPersi
     this.onEvent("started", startedData);
     const resultData: ResultEventData = { output: input.outputPayload };
     this.onEvent("result", resultData);
-    const doneData: DoneEventData = {};
-    this.onEvent("done", doneData);
     return record;
   }
 
@@ -175,8 +173,6 @@ export class StreamingReviewExecutionPersistence implements ReviewExecutionPersi
     const record = await this.delegate.markSuccess(input);
     const resultData: ResultEventData = { output: input.outputPayload };
     this.onEvent("result", resultData);
-    const doneData: DoneEventData = {};
-    this.onEvent("done", doneData);
     return record;
   }
 
@@ -184,8 +180,6 @@ export class StreamingReviewExecutionPersistence implements ReviewExecutionPersi
     const record = await this.delegate.markFailed(input);
     const errorData: ErrorEventData = { message: input.errorMessage };
     this.onEvent("error", errorData);
-    const doneData: DoneEventData = {};
-    this.onEvent("done", doneData);
     return record;
   }
 
@@ -230,7 +224,8 @@ export class DefaultReviewService implements ReviewService {
       ? new ReviewEngine(
           currentEngine.getGraph(),
           streamingPersistence,
-          currentEngine.getTelemetrySource()
+          currentEngine.getTelemetrySource(),
+          currentEngine.getWebhookNotifier(),
         )
       : ReviewEngine.createDefault({
           persistence: streamingPersistence,

@@ -45,6 +45,9 @@ export class ReviewController {
       await this.reviewService.executeStream(parsed.data, (event, data) => {
         sendSSE(event, data);
       });
+      if (!sentDone) {
+        sendSSE("done", {});
+      }
     } catch (error) {
       if (!sentDone) {
         const handled = handleUnknownError(error);

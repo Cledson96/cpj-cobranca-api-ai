@@ -39,6 +39,7 @@ services:
       LANGSMITH_TRACING: "${LANGSMITH_TRACING:-false}"
       LANGSMITH_API_KEY: "${LANGSMITH_API_KEY:-}"
       LANGSMITH_PROJECT: cpj-cobranca-api-ai
+      WEBHOOK_CALLBACK_URL: "${WEBHOOK_CALLBACK_URL:-}"
     depends_on:
       postgres:
         condition: service_healthy

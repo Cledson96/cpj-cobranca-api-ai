@@ -12,4 +12,10 @@ describe("docker-compose.yml", () => {
     expect(compose).toContain('"5432:5432"');
     expect(compose).toContain("pg_isready -U postgres -d cpj_cobranca");
   });
+
+  it("repassa URL de webhook opcional para a API", () => {
+    const compose = readFileSync("docker-compose.yml", "utf8");
+
+    expect(compose).toContain('WEBHOOK_CALLBACK_URL: "${WEBHOOK_CALLBACK_URL:-}"');
+  });
 });

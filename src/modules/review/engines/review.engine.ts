@@ -27,6 +27,11 @@ import {
   type ReviewGraphRunner,
   type ReviewStepRecorder,
 } from "../graphs";
+import {
+  HttpReviewWebhookNotifier,
+  type ReviewWebhookNotifier,
+  type ReviewWebhookPayload,
+} from "./review-webhook.notifier";
 
 export interface ReviewExecutionPersistence extends ReviewStepRecorder {
   createPending(input: CreatePendingReviewExecutionInput): Promise<ReviewExecutionRecord>;
@@ -48,6 +53,7 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
     private readonly graph: ReviewGraphRunner,
     private readonly persistence?: ReviewExecutionPersistence,
     private readonly telemetrySource?: AgentExecutionTelemetrySource,
+    private readonly webhookNotifier?: ReviewWebhookNotifier,
   ) {
     super("review");
   }
@@ -77,6 +83,9 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
       }),
       input.persistence,
       telemetryCollector,
+      env.WEBHOOK_CALLBACK_URL
+        ? new HttpReviewWebhookNotifier(env.WEBHOOK_CALLBACK_URL)
+        : undefined,
     );
   }
 
@@ -108,6 +117,13 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
           inputPayload: { requestHash: hash },
           outputPayload: { cacheHit: true, sourceExecutionId: cached.id },
           durationMs,
+        });
+
+        await this.notifyWebhook({
+          executionId: execution.id,
+          status: "success",
+          cacheHit: true,
+          output: cached.outputPayload as ReviewResponse,
         });
 
         return cached.outputPayload as ReviewResponse;
@@ -142,6 +158,12 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
         outputPayload: output,
         durationMs: dayjs().valueOf() - startedAt,
       });
+      await this.notifyWebhook({
+        executionId: execution.id,
+        status: "success",
+        cacheHit: false,
+        output,
+      });
       await this.recordTelemetry(execution.id);
 
       return output;
@@ -152,7 +174,71 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
         errorMessage: handledError.message,
         durationMs: dayjs().valueOf() - startedAt,
       });
+      await this.notifyWebhook({
+        executionId: execution.id,
+        status: "failed",
+        cacheHit: false,
+        errorMessage: handledError.message,
+      });
       throw handledError;
+    }
+  }
+
+  private async notifyWebhook(input: {
+    executionId: string;
+    status: "success" | "failed";
+    cacheHit: boolean;
+    output?: ReviewResponse;
+    errorMessage?: string;
+  }): Promise<void> {
+    if (!this.persistence || !this.webhookNotifier) {
+      return;
+    }
+
+    const startedAt = dayjs().valueOf();
+    const payload: ReviewWebhookPayload = input.status === "success"
+      ? {
+          flow_type: "review",
+          execution_id: input.executionId,
+          status: "success",
+          cache_hit: input.cacheHit,
+          output: input.output as ReviewResponse,
+        }
+      : {
+          flow_type: "review",
+          execution_id: input.executionId,
+          status: "failed",
+          cache_hit: false,
+          error_message: input.errorMessage ?? "Erro desconhecido no review.",
+        };
+
+    try {
+      await this.webhookNotifier.notify(payload);
+      await this.persistence.recordStep({
+        executionId: input.executionId,
+        nodeName: "webhook_callback",
+        kind: "webhook",
+        status: "success",
+        inputPayload: {
+          status: payload.status,
+          cacheHit: payload.cache_hit,
+        },
+        outputPayload: { delivered: true },
+        durationMs: dayjs().valueOf() - startedAt,
+      });
+    } catch (error) {
+      await this.persistence.recordStep({
+        executionId: input.executionId,
+        nodeName: "webhook_callback",
+        kind: "webhook",
+        status: "failed",
+        inputPayload: {
+          status: payload.status,
+          cacheHit: payload.cache_hit,
+        },
+        durationMs: dayjs().valueOf() - startedAt,
+        errorMessage: getErrorMessage(error),
+      });
     }
   }
 
@@ -189,9 +275,21 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
   getTelemetrySource(): AgentExecutionTelemetrySource | undefined {
     return this.telemetrySource;
   }
+
+  getWebhookNotifier(): ReviewWebhookNotifier | undefined {
+    return this.webhookNotifier;
+  }
 }
 
 
 function toNullableUsdString(value: number | null): string | null {
   return value === null ? null : value.toString();
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Erro desconhecido no webhook callback.";
 }

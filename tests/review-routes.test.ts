@@ -201,6 +201,41 @@ describe("POST /api/v1/review/stream", () => {
     await app.close();
   });
 
+  it("emite done quando service conclui stream sem evento terminal", async () => {
+    const reviewService = {
+      execute: vi.fn(),
+      executeStream: vi.fn().mockImplementation(async (_input, onEvent) => {
+        onEvent("started", { execution_id: "execution-stream-1", cache_hit: false });
+        onEvent("result", { output: reviewResponse });
+        return reviewResponse;
+      }),
+    };
+    const app = buildApp({
+      env: createTestEnv(),
+      registerDatabase: false,
+      serverOptions: { logger: false },
+      dependencies: { reviewService },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/review/stream",
+      payload: validPayload,
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const eventNames = response.body
+      .split("\n")
+      .filter((line) => line.startsWith("event: "))
+      .map((line) => line.replace("event: ", ""));
+
+    expect(eventNames).toContain("result");
+    expect(eventNames.filter((event) => event === "done")).toHaveLength(1);
+
+    await app.close();
+  });
+
   it("nao duplica eventos terminais quando service ja emitiu erro e done", async () => {
     const reviewService = {
       execute: vi.fn(),
