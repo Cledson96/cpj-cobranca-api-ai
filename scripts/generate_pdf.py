@@ -1,7 +1,55 @@
 import os
 import re
+import base64
+import hashlib
+import requests
 from markdown import markdown
 from xhtml2pdf import pisa
+
+def process_mermaid_blocks(md_content, docs_dir):
+    # Garantir que a pasta de imagens dos diagramas existe
+    images_dir = os.path.join(docs_dir, "images")
+    os.makedirs(images_dir, exist_ok=True)
+    
+    # Regex para encontrar blocos ```mermaid ... ```
+    pattern = re.compile(r"```mermaid\n(.*?)\n```", re.DOTALL)
+    
+    def replacer(match):
+        mermaid_code = match.group(1).strip()
+        
+        # Gerar um hash único para este diagrama
+        code_hash = hashlib.md5(mermaid_code.encode("utf-8")).hexdigest()
+        image_name = f"mermaid_{code_hash}.png"
+        image_path = os.path.join(images_dir, image_name)
+        absolute_path = os.path.abspath(image_path).replace("\\", "/")  # Formato universal
+        
+        # Se a imagem já existe localmente, apenas retorna a tag img
+        if os.path.exists(image_path):
+            print(f" - Diagrama em cache carregado: {image_name}")
+            return f'<p class="text-center"><img src="{absolute_path}" class="mermaid-diagram" style="max-width: 100%; max-height: 380px; margin: 15px auto;" /></p>'
+            
+        # Caso contrário, faz o download do diagrama renderizado usando a API do mermaid.ink
+        print(f" - Renderizando diagrama via mermaid.ink: {image_name}...")
+        try:
+            encoded_code = base64.b64encode(mermaid_code.encode("utf-8")).decode("utf-8")
+            url = f"https://mermaid.ink/img/{encoded_code}"
+            
+            response = requests.get(url, timeout=20)
+            if response.status_code == 200:
+                with open(image_path, "wb") as img_file:
+                    img_file.write(response.content)
+                print("   [OK] Diagrama baixado e salvo com sucesso!")
+                return f'<p class="text-center"><img src="{absolute_path}" class="mermaid-diagram" style="max-width: 100%; max-height: 380px; margin: 15px auto;" /></p>'
+            else:
+                print(f"   [AVISO] API retornou status {response.status_code}, usando fallback de código.")
+        except Exception as e:
+            print(f"   [AVISO] Erro de rede ao conectar com mermaid.ink ({e}), usando fallback.")
+            
+        # Fallback de segurança: bloco de código com formatação legível (fundo escuro, texto claro)
+        escaped_code = mermaid_code.replace("<", "&lt;").replace(">", "&gt;")
+        return f'<pre class="mermaid-fallback" style="background-color: #1a202c; color: #edf2f7; border: 1px solid #4a5568; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 8.5pt;"><code>{escaped_code}</code></pre>'
+        
+    return pattern.sub(replacer, md_content)
 
 def generate_pdf():
     docs_dir = "docs"
@@ -18,20 +66,22 @@ def generate_pdf():
         return
         
     print(f"Arquivos encontrados: {len(files)}")
-    for f in files:
-        print(f" - {f}")
-
-    # 2. Ler todos os arquivos e converter para HTML
+    
+    # 2. Ler todos os arquivos, processar diagramas e converter para HTML
     chapters_html = []
     for file_name in files:
         file_path = os.path.join(docs_dir, file_name)
+        print(f"Lendo e processando: {file_name}...")
+        
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
             
-        # Converter markdown para HTML usando extensões apropriadas (tabelas, blocos de código)
-        html_content = markdown(content, extensions=["extra"])
+        # Processar blocos do mermaid transformando em imagens
+        processed_content = process_mermaid_blocks(content, docs_dir)
+            
+        # Converter markdown para HTML usando extensões adicionais
+        html_content = markdown(processed_content, extensions=["extra"])
         
-        # Envelopar o capítulo em uma div com classe para estilização e quebras de página
         chapters_html.append(f"""
         <div class="chapter-container">
             {html_content}
