@@ -15,7 +15,18 @@ type QueryValue = string | number | boolean | null | undefined;
 
 export function getApiBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-  return (configured || "http://localhost:3000").replace(/\/+$/, "");
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location;
+    if (hostname === "preambulo.cledson.com.br") {
+      return `${protocol}//api.preambulo.cledson.com.br`;
+    }
+  }
+
+  return "http://localhost:3000";
 }
 
 export function buildQueryString(input: Record<string, QueryValue> = {}): string {

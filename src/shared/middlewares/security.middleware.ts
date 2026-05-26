@@ -6,7 +6,9 @@ import type { AppEnv } from "@shared";
 
 export class SecurityMiddleware {
   static register(app: FastifyInstance, env: AppEnv): void {
-    app.register(helmet);
+    app.register(helmet, {
+      contentSecurityPolicy: false,
+    });
     app.register(cors, {
       origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN,
     });

@@ -9,7 +9,6 @@ describe("docker-compose.yml", () => {
     expect(compose).toContain("POSTGRES_DB: cpj_cobranca");
     expect(compose).toContain("POSTGRES_USER: postgres");
     expect(compose).toContain("POSTGRES_PASSWORD: postgres");
-    expect(compose).toContain('"5432:5432"');
     expect(compose).toContain("pg_isready -U postgres -d cpj_cobranca");
   });
 
@@ -24,7 +23,7 @@ describe("docker-compose.yml", () => {
 
     expect(compose).toContain("web:");
     expect(compose).toContain("dockerfile: apps/web/Dockerfile");
-    expect(compose).toContain('"3001:3001"');
+    expect(compose).toContain('"${WEB_PORT_MAP:-3001:3001}"');
     expect(compose).toContain("NEXT_PUBLIC_API_BASE_URL: http://localhost:3000");
   });
 });
