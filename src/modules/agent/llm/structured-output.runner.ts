@@ -2,6 +2,7 @@ import { ChatOpenRouter } from "@langchain/openrouter";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { z } from "zod";
 import { GenericError, handleUnknownError } from "@/infrastructure/errors";
+import { retryWithBackoff } from "@shared";
 import type { AgentExecutionTelemetrySink } from "../telemetry";
 import type { GenerationStatsClient } from "./openrouter-generation-stats.client";
 import { OpenRouterTelemetryCallback } from "./openrouter-telemetry.callback";
@@ -29,6 +30,8 @@ export interface StructuredOutputRunner {
 export type LangChainStructuredOutputRunnerOptions = {
   generationStatsClient?: GenerationStatsClient;
   modelRequested: string;
+  retryAttempts?: number;
+  retryBaseDelayMs?: number;
   telemetrySink?: AgentExecutionTelemetrySink;
 };
 
@@ -88,8 +91,12 @@ export class LangChainStructuredOutputRunner implements StructuredOutputRunner {
         createStructuredOutputConfig(input.schemaName),
       );
       const telemetryCallback = new OpenRouterTelemetryCallback();
-      const rawOutput = await structuredModel.invoke(input.messages, {
-        callbacks: [telemetryCallback],
+      const rawOutput = await retryWithBackoff({
+        operation: () => structuredModel.invoke(input.messages, {
+          callbacks: [telemetryCallback],
+        }),
+        maxAttempts: this.options?.retryAttempts ?? 1,
+        baseDelayMs: this.options?.retryBaseDelayMs ?? 0,
       });
       const structuredOutput = rawStructuredOutputSchema.safeParse(rawOutput);
 

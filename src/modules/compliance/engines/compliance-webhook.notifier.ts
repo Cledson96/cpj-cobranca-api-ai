@@ -1,4 +1,4 @@
-import type { ComplianceResponse } from "@shared";
+import { retryHttpOperation, type ComplianceResponse } from "@shared";
 
 export type ComplianceWebhookSuccessPayload = {
   flow_type: "compliance";
@@ -39,13 +39,18 @@ export class HttpComplianceWebhookNotifier implements ComplianceWebhookNotifier 
   constructor(
     private readonly callbackUrl: string,
     private readonly fetchFn: WebhookFetch = fetch,
+    private readonly retry = { attempts: 1, baseDelayMs: 0 },
   ) {}
 
   async notify(payload: ComplianceWebhookPayload): Promise<void> {
-    const response = await this.fetchFn(this.callbackUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+    const response = await retryHttpOperation({
+      operation: () => this.fetchFn(this.callbackUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+      maxAttempts: this.retry.attempts,
+      baseDelayMs: this.retry.baseDelayMs,
     });
 
     if (!response.ok) {

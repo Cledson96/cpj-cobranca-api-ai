@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { GenericError, handleUnknownError } from "@/infrastructure/errors";
-import { type AppEnv, loadEnv, type PullRequestReviewRequest } from "@shared";
+import { retryHttpOperation, type AppEnv, loadEnv, type PullRequestReviewRequest } from "@shared";
 import { parseGitHubPullRequestUrl } from "./github-url";
 import type {
   GitHubContextFile,
@@ -116,12 +116,16 @@ export class HttpGitHubPullRequestClient implements GitHubPullRequestClient {
   }
 
   private async request(path: string, accept: string): Promise<Response> {
-    const response = await fetch(`https://api.github.com${path}`, {
-      headers: {
-        "Accept": accept,
-        "Authorization": `Bearer ${this.env.GITHUB_TOKEN}`,
-        "User-Agent": "cpj-cobranca-api-ai",
-      },
+    const response = await retryHttpOperation({
+      operation: () => fetch(`https://api.github.com${path}`, {
+        headers: {
+          "Accept": accept,
+          "Authorization": `Bearer ${this.env.GITHUB_TOKEN}`,
+          "User-Agent": "cpj-cobranca-api-ai",
+        },
+      }),
+      maxAttempts: this.env.EXTERNAL_RETRY_ATTEMPTS,
+      baseDelayMs: this.env.EXTERNAL_RETRY_BASE_DELAY_MS,
     });
 
     if (!response.ok) {

@@ -22,12 +22,16 @@ describe("Env", () => {
       ...createTestEnvSource(),
       PORT: "3333",
       REQUEST_TIMEOUT_MS: "9000",
+      EXTERNAL_RETRY_ATTEMPTS: "4",
+      EXTERNAL_RETRY_BASE_DELAY_MS: "125",
       LANGSMITH_TRACING: "true",
       OPENROUTER_FETCH_GENERATION_STATS: "false",
     }).values;
 
     expect(env.PORT).toBe(3333);
     expect(env.REQUEST_TIMEOUT_MS).toBe(9000);
+    expect(env.EXTERNAL_RETRY_ATTEMPTS).toBe(4);
+    expect(env.EXTERNAL_RETRY_BASE_DELAY_MS).toBe(125);
     expect(env.LANGSMITH_TRACING).toBe(true);
     expect(env.OPENROUTER_FETCH_GENERATION_STATS).toBe(false);
   });

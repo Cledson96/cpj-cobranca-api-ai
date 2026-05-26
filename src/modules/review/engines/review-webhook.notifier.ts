@@ -1,4 +1,4 @@
-import type { ReviewResponse } from "@shared";
+import { retryHttpOperation, type ReviewResponse } from "@shared";
 
 export type ReviewWebhookSuccessPayload = {
   flow_type: "review";
@@ -39,13 +39,18 @@ export class HttpReviewWebhookNotifier implements ReviewWebhookNotifier {
   constructor(
     private readonly callbackUrl: string,
     private readonly fetchFn: WebhookFetch = fetch,
+    private readonly retry = { attempts: 1, baseDelayMs: 0 },
   ) {}
 
   async notify(payload: ReviewWebhookPayload): Promise<void> {
-    const response = await this.fetchFn(this.callbackUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+    const response = await retryHttpOperation({
+      operation: () => this.fetchFn(this.callbackUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+      maxAttempts: this.retry.attempts,
+      baseDelayMs: this.retry.baseDelayMs,
     });
 
     if (!response.ok) {

@@ -74,6 +74,8 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
     const structuredOutputRunner = new LangChainStructuredOutputRunner(chatModel, {
       generationStatsClient: OpenRouterGenerationStatsClient.createFromEnv(env),
       modelRequested: requestedModel,
+      retryAttempts: env.EXTERNAL_RETRY_ATTEMPTS,
+      retryBaseDelayMs: env.EXTERNAL_RETRY_BASE_DELAY_MS,
       telemetrySink: telemetryCollector,
     });
 
@@ -90,7 +92,10 @@ export class ReviewEngine extends BaseAgentEngine<ReviewRequest, ReviewResponse>
       input.persistence,
       telemetryCollector,
       env.WEBHOOK_CALLBACK_URL
-        ? new HttpReviewWebhookNotifier(env.WEBHOOK_CALLBACK_URL)
+        ? new HttpReviewWebhookNotifier(env.WEBHOOK_CALLBACK_URL, fetch, {
+            attempts: env.EXTERNAL_RETRY_ATTEMPTS,
+            baseDelayMs: env.EXTERNAL_RETRY_BASE_DELAY_MS,
+          })
         : undefined,
       input.promptResolver ?? new LegacyPromptRuntimeResolver(),
     );

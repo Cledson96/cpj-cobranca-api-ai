@@ -62,6 +62,8 @@ export class TestsEngine extends BaseAgentEngine<TestsRequest, TestsResponse> {
     const structuredOutputRunner = new LangChainStructuredOutputRunner(chatModel, {
       generationStatsClient: OpenRouterGenerationStatsClient.createFromEnv(env),
       modelRequested: requestedModel,
+      retryAttempts: env.EXTERNAL_RETRY_ATTEMPTS,
+      retryBaseDelayMs: env.EXTERNAL_RETRY_BASE_DELAY_MS,
       telemetrySink: telemetryCollector,
     });
 
@@ -70,7 +72,10 @@ export class TestsEngine extends BaseAgentEngine<TestsRequest, TestsResponse> {
       input.persistence,
       telemetryCollector,
       env.WEBHOOK_CALLBACK_URL
-        ? new HttpTestsWebhookNotifier(env.WEBHOOK_CALLBACK_URL)
+        ? new HttpTestsWebhookNotifier(env.WEBHOOK_CALLBACK_URL, fetch, {
+            attempts: env.EXTERNAL_RETRY_ATTEMPTS,
+            baseDelayMs: env.EXTERNAL_RETRY_BASE_DELAY_MS,
+          })
         : undefined,
       input.promptResolver ?? new LegacyPromptRuntimeResolver(),
     );

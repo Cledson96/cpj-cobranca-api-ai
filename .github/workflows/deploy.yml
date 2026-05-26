@@ -59,6 +59,8 @@ jobs:
           cat > /tmp/.env.production << 'ENVEOF'
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_DEFAULT_MODEL=${{ secrets.OPENROUTER_DEFAULT_MODEL || 'openai/gpt-4o-mini' }}
+          EXTERNAL_RETRY_ATTEMPTS=${{ secrets.EXTERNAL_RETRY_ATTEMPTS || '2' }}
+          EXTERNAL_RETRY_BASE_DELAY_MS=${{ secrets.EXTERNAL_RETRY_BASE_DELAY_MS || '250' }}
           GITHUB_TOKEN=${{ secrets.GH_PAT || '' }}
           JIRA_BASE_URL=${{ secrets.JIRA_BASE_URL || '' }}
           JIRA_EMAIL=${{ secrets.JIRA_EMAIL || '' }}

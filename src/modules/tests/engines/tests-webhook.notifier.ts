@@ -1,4 +1,4 @@
-import type { TestsResponse } from "@shared";
+import { retryHttpOperation, type TestsResponse } from "@shared";
 import { GenericError } from "@/infrastructure/errors";
 
 export type TestsWebhookSuccessPayload = {
@@ -29,13 +29,18 @@ export class HttpTestsWebhookNotifier implements TestsWebhookNotifier {
   constructor(
     private readonly url: string,
     private readonly fetchFn: FetchLike = fetch,
+    private readonly retry = { attempts: 1, baseDelayMs: 0 },
   ) {}
 
   async notify(payload: TestsWebhookPayload): Promise<void> {
-    const response = await this.fetchFn(this.url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+    const response = await retryHttpOperation({
+      operation: () => this.fetchFn(this.url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+      maxAttempts: this.retry.attempts,
+      baseDelayMs: this.retry.baseDelayMs,
     });
 
     if (!response.ok) {

@@ -127,6 +127,8 @@ export class PullRequestTestsFlowGraph implements PullRequestTestsGraphRunner {
     const runner = new LangChainStructuredOutputRunner(chatModel, {
       generationStatsClient: OpenRouterGenerationStatsClient.createFromEnv(env),
       modelRequested: requestedModel,
+      retryAttempts: env.EXTERNAL_RETRY_ATTEMPTS,
+      retryBaseDelayMs: env.EXTERNAL_RETRY_BASE_DELAY_MS,
       telemetrySink: telemetryCollector,
     });
 

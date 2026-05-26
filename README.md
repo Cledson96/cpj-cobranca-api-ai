@@ -17,6 +17,7 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 - **Ferramentas determinísticas** — análise estática complementar (regex patterns, lint-like checks)
 - **Histórico de execuções** — persistência em PostgreSQL via Prisma com steps e telemetria
 - **Suporte a cache** — hash da requisição + rate limiting integrado
+- **Retry configurável com backoff** — novas tentativas em chamadas externas e LLM para falhas transitórias
 - **OpenAPI/Swagger UI** — docs interativos em `/docs`
 - **Painel admin Next.js** — console em `apps/web` para historico, prompts, modelos, custos, tokens e execucao guiada
 - **OpenRouter** — provedor LLM multi-modelo
@@ -50,6 +51,7 @@ Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementa
 - **LangGraph.js + LangChain.js**: modela os fluxos como grafos explícitos, separando tools determinísticas, agentes especialistas, agregação e persistência de steps.
 - **OpenRouter**: mantém integração de chat e structured output, enquanto a escolha do modelo fica centralizada em catálogo persistido no banco.
 - **LangSmith opcional**: tracing fica disponível por configuração, sem bloquear execução local ou Docker quando não houver chave.
+- **Retry com backoff**: chamadas ao LLM, OpenRouter, GitHub, Jira e webhook são repetidas em falhas transitórias, com tentativas e delay base configuráveis por ambiente.
 - **Docker Compose**: sobe API e banco com migrations e seed inicial aplicados antes do start da API.
 
 ## Custo estimado
@@ -447,6 +449,8 @@ Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review`, `c
 | `DATABASE_URL`               | `postgresql://postgres:postgres@localhost:5432/...` | ✅          |
 | `OPENROUTER_API_KEY`         | `sk-or-...`                                       | ✅          |
 | `OPENROUTER_DEFAULT_MODEL`   | `openai/gpt-4o-mini`                              | ✅          |
+| `EXTERNAL_RETRY_ATTEMPTS`    | `2`                                               | ❌          |
+| `EXTERNAL_RETRY_BASE_DELAY_MS` | `250`                                           | ❌          |
 | `GITHUB_TOKEN`               | `ghp_...`                                         | ✅ para PR review |
 | `JIRA_BASE_URL`              | `https://empresa.atlassian.net`                   | ❌          |
 | `JIRA_EMAIL`                 | `dev@empresa.com`                                 | ❌          |

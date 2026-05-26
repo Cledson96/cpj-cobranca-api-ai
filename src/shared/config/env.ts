@@ -21,6 +21,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().trim().min(1).default("*"),
   BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(2_097_152),
   REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  EXTERNAL_RETRY_ATTEMPTS: z.coerce.number().int().positive().default(2),
+  EXTERNAL_RETRY_BASE_DELAY_MS: z.coerce.number().int().nonnegative().default(250),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   RATE_LIMIT_WINDOW: z.string().trim().min(1).default("1 minute"),
   DATABASE_URL: z.string().trim().min(1),

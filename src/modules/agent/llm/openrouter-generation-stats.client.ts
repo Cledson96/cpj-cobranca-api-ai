@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { retryHttpOperation } from "@shared";
 import type { AppEnv } from "@shared";
 import { roundUsd, type LlmRunTelemetry } from "../telemetry";
 
@@ -53,6 +54,8 @@ export class OpenRouterGenerationStatsClient implements GenerationStatsClient {
       apiKey: string;
       enabled: boolean;
       baseUrl?: string;
+      retryAttempts: number;
+      retryBaseDelayMs: number;
     },
   ) {}
 
@@ -60,6 +63,8 @@ export class OpenRouterGenerationStatsClient implements GenerationStatsClient {
     return new OpenRouterGenerationStatsClient({
       apiKey: env.OPENROUTER_API_KEY,
       enabled: env.OPENROUTER_FETCH_GENERATION_STATS,
+      retryAttempts: env.EXTERNAL_RETRY_ATTEMPTS,
+      retryBaseDelayMs: env.EXTERNAL_RETRY_BASE_DELAY_MS,
     });
   }
 
@@ -72,8 +77,12 @@ export class OpenRouterGenerationStatsClient implements GenerationStatsClient {
       return input.fallback;
     }
 
-    const response = await fetch(`${this.baseUrl()}/generation?id=${encodeURIComponent(input.generationId)}`, {
-      headers: this.headers(),
+    const response = await retryHttpOperation({
+      operation: () => fetch(`${this.baseUrl()}/generation?id=${encodeURIComponent(input.generationId)}`, {
+        headers: this.headers(),
+      }),
+      maxAttempts: this.input.retryAttempts,
+      baseDelayMs: this.input.retryBaseDelayMs,
     });
     if (!response.ok) {
       return input.fallback;
@@ -130,8 +139,12 @@ export class OpenRouterGenerationStatsClient implements GenerationStatsClient {
       return this.pricingByModel.get(model) ?? null;
     }
 
-    const response = await fetch(`${this.baseUrl()}/models`, {
-      headers: this.headers(),
+    const response = await retryHttpOperation({
+      operation: () => fetch(`${this.baseUrl()}/models`, {
+        headers: this.headers(),
+      }),
+      maxAttempts: this.input.retryAttempts,
+      baseDelayMs: this.input.retryBaseDelayMs,
     });
     if (!response.ok) {
       this.pricingByModel.set(model, null);

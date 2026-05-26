@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { GenericError } from "@/infrastructure/errors";
-import { type AppEnv, loadEnv } from "@shared";
+import { retryHttpOperation, type AppEnv, loadEnv } from "@shared";
 import type { JiraIssueClient, JiraIssueSource } from "./models";
 
 type JiraIssueResponse = {
@@ -19,15 +19,19 @@ export class HttpJiraIssueClient implements JiraIssueClient {
       throw new GenericError("Credenciais do Jira nao configuradas para consultar criterios do card.");
     }
 
-    const response = await fetch(
-      `${this.env.JIRA_BASE_URL}/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=summary,description`,
-      {
-        headers: {
-          "Accept": "application/json",
-          "Authorization": `Basic ${Buffer.from(`${this.env.JIRA_EMAIL}:${this.env.JIRA_API_TOKEN}`).toString("base64")}`,
+    const response = await retryHttpOperation({
+      operation: () => fetch(
+        `${this.env.JIRA_BASE_URL}/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=summary,description`,
+        {
+          headers: {
+            "Accept": "application/json",
+            "Authorization": `Basic ${Buffer.from(`${this.env.JIRA_EMAIL}:${this.env.JIRA_API_TOKEN}`).toString("base64")}`,
+          },
         },
-      },
-    );
+      ),
+      maxAttempts: this.env.EXTERNAL_RETRY_ATTEMPTS,
+      baseDelayMs: this.env.EXTERNAL_RETRY_BASE_DELAY_MS,
+    });
 
     if (!response.ok) {
       throw new GenericError(`Jira retornou ${response.status} ao consultar o card ${issueKey}.`);
