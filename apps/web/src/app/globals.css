@@ -133,19 +133,32 @@ a {
 .app-shell__menu .ant-menu-item {
   width: 100%;
   margin: 8px 0;
-  color: rgba(255, 255, 255, 0.74);
+  color: rgba(255, 255, 255, 0.74) !important;
   font-weight: 600;
 }
 
+.app-shell__menu .ant-menu-item a {
+  color: rgba(255, 255, 255, 0.74) !important;
+  transition: color 0.3s ease;
+}
+
 .app-shell__menu .ant-menu-item:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.app-shell__menu .ant-menu-item:hover a {
+  color: #fff !important;
 }
 
 .app-shell__menu .ant-menu-item-selected {
-  color: #08111f;
-  background: linear-gradient(135deg, #f7d774 0%, #94f4cb 100%);
-  box-shadow: 0 14px 34px rgba(52, 211, 153, 0.2);
+  color: #08111f !important;
+  background: linear-gradient(135deg, #f7d774 0%, #94f4cb 100%) !important;
+  box-shadow: 0 14px 34px rgba(52, 211, 153, 0.2) !important;
+}
+
+.app-shell__menu .ant-menu-item-selected a {
+  color: #08111f !important;
 }
 
 .brand-block {
