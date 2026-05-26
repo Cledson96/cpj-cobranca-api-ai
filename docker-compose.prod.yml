@@ -10,8 +10,6 @@ services:
       POSTGRES_PASSWORD: "cpj_c0branca_pr0d_2026"
 
   api:
-    ports:
-      - "127.0.0.1:3020:3000"
     environment:
       DATABASE_URL: "postgresql://postgres:cpj_c0branca_pr0d_2026@postgres:5432/cpj_cobranca?schema=public"
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
@@ -29,7 +27,5 @@ services:
       WEBHOOK_CALLBACK_URL: "${WEBHOOK_CALLBACK_URL:-}"
 
   web:
-    ports:
-      - "127.0.0.1:3021:3001"
     environment:
       NEXT_PUBLIC_API_BASE_URL: "https://api.preambulo.cledson.com.br"
