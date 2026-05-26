@@ -1,0 +1,98 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: cpj-cobranca-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Build and checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build API
+        run: npm run build
+
+      - name: Build Web
+        run: npm run build:web
+
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    needs: ci
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${{ secrets.VPS_PORT || 22 }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Generate .env file
+        run: |
+          cat > /tmp/.env.production << 'ENVEOF'
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_DEFAULT_MODEL=${{ secrets.OPENROUTER_DEFAULT_MODEL || 'openai/gpt-4o-mini' }}
+          GITHUB_TOKEN=${{ secrets.GH_PAT || '' }}
+          JIRA_BASE_URL=${{ secrets.JIRA_BASE_URL || '' }}
+          JIRA_EMAIL=${{ secrets.JIRA_EMAIL || '' }}
+          JIRA_API_TOKEN=${{ secrets.JIRA_API_TOKEN || '' }}
+          LANGSMITH_TRACING=${{ secrets.LANGSMITH_TRACING || 'false' }}
+          LANGSMITH_API_KEY=${{ secrets.LANGSMITH_API_KEY || '' }}
+          WEBHOOK_CALLBACK_URL=${{ secrets.WEBHOOK_CALLBACK_URL || '' }}
+          ENVEOF
+          sed -i 's/^          //' /tmp/.env.production
+
+      - name: Upload .env and deploy
+        env:
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/cpj-cobranca' }}
+          REPO_URL: ${{ vars.REPO_URL || 'git@github.com:Cledson96/cpj-cobranca-api-ai.git' }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/id_ed25519 -p $VPS_PORT"
+          SCP_CMD="scp -i ~/.ssh/id_ed25519 -P $VPS_PORT"
+
+          # Upload .env
+          $SCP_CMD /tmp/.env.production "$VPS_USER@$VPS_HOST:/tmp/.env.cpj-cobranca"
+
+          # First-time: clone repo if it doesn't exist
+          $SSH_CMD "$VPS_USER@$VPS_HOST" bash -c "'
+            if [ ! -d \"$DEPLOY_PATH/.git\" ]; then
+              echo \"[deploy] first-time setup: cloning repository\"
+              git clone --branch main \"$REPO_URL\" \"$DEPLOY_PATH\"
+            fi
+            cp /tmp/.env.cpj-cobranca \"$DEPLOY_PATH/.env\"
+            rm -f /tmp/.env.cpj-cobranca
+          '"
+
+          # Run deploy
+          $SSH_CMD "$VPS_USER@$VPS_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' bash '$DEPLOY_PATH/scripts/deploy.sh'"

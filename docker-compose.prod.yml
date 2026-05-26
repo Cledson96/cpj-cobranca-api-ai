@@ -1,0 +1,37 @@
+# Production overrides — used together with docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Ports are bound to 127.0.0.1 so only Nginx can reach them.
+# Secrets come from the .env file (created by the GitHub Actions workflow).
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: "cpj_c0branca_pr0d_2026"
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  api:
+    ports:
+      - "127.0.0.1:3020:3000"
+    environment:
+      DATABASE_URL: "postgresql://postgres:cpj_c0branca_pr0d_2026@postgres:5432/cpj_cobranca?schema=public"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
+      OPENROUTER_DEFAULT_MODEL: "${OPENROUTER_DEFAULT_MODEL:-openai/gpt-4o-mini}"
+      OPENROUTER_SITE_URL: "https://api.preambulo.cledson.com.br"
+      OPENROUTER_APP_TITLE: "CPJ Cobranca API AI"
+      OPENROUTER_FETCH_GENERATION_STATS: "true"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+      JIRA_BASE_URL: "${JIRA_BASE_URL:-}"
+      JIRA_EMAIL: "${JIRA_EMAIL:-}"
+      JIRA_API_TOKEN: "${JIRA_API_TOKEN:-}"
+      LANGSMITH_TRACING: "true"
+      LANGSMITH_API_KEY: "${LANGSMITH_API_KEY:-}"
+      LANGSMITH_PROJECT: "${LANGSMITH_PROJECT:-cpj-cobranca-api-ai}"
+      WEBHOOK_CALLBACK_URL: "${WEBHOOK_CALLBACK_URL:-}"
+
+  web:
+    ports:
+      - "127.0.0.1:3021:3001"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: "https://api.preambulo.cledson.com.br"
