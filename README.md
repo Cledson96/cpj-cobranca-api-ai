@@ -470,7 +470,7 @@ Quando `WEBHOOK_CALLBACK_URL` estiver configurado, cada execucao de `review`, `c
 
 - Adicionar streaming SSE também para `/api/v1/document`, embora o diferencial de streaming já esteja coberto em `/api/v1/review/stream`.
 - Criar uma suíte de avaliação com fixtures maiores por linguagem e snapshots de qualidade dos agentes.
-- Adicionar retry/backoff configurável para chamadas ao provedor LLM e webhook externo.
+- Refinar a estrategia de retry com politicas especificas por integracao, incluindo jitter e limites distintos para LLM, webhook e APIs externas.
 - Oferecer modo local com Ollama para reduzir custo em ambientes de avaliação sem chave paga.
 
 ## Estrutura do Projeto

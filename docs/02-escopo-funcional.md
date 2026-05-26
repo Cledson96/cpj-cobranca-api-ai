@@ -1,7 +1,5 @@
 # Escopo Funcional
 
-> Status: em revisao
-
 ## Objetivo deste capitulo
 
 Este capitulo descreve o que a solucao entrega do ponto de vista funcional.
@@ -26,7 +24,26 @@ O escopo funcional esta organizado em quatro grupos:
 - **Experiencia operacional**: Swagger/OpenAPI, arquivo `.http`, Docker Compose
   e painel web admin.
 
+## Leitura do escopo na perspectiva do case
+
+Para um avaliador tecnico, este capitulo deve ser lido em tres camadas:
+
+- **o que era obrigatorio no enunciado** e precisa existir para o case estar
+  funcional;
+- **o que amplia a entrega alem do minimo pedido**, aumentando o valor tecnico
+  e a proximidade com um cenario real de uso;
+- **o que ainda nao faz parte desta versao**, mas aparece como evolucao natural
+  para um produto mais maduro.
+
+Na pratica, os fluxos `review`, `compliance`, `document` e `tests`, junto com
+`GET /health` e os endpoints de historico, representam o nucleo obrigatorio do
+case. Os demais recursos mostram como a solucao foi estendida para melhorar
+operacao, avaliacao, governanca e uso no dia a dia.
+
 ## Fluxos obrigatorios do case
+
+Esta secao descreve o coracao funcional pedido no enunciado. Sem esses fluxos,
+o case nao estaria completo do ponto de vista da entrega minima esperada.
 
 ### Code Review Automatizado
 
@@ -94,6 +111,10 @@ e situacoes de erro, sem substituir a revisao tecnica de quem conhece o dominio
 do modulo.
 
 ## Diferenciais implementados
+
+Os itens abaixo nao eram obrigatorios no enunciado, mas foram implementados
+para tornar a solucao mais completa, mais demonstravel e mais proxima de um uso
+real em ambiente tecnico.
 
 ### Streaming do review
 
@@ -273,9 +294,10 @@ como console tecnico para:
 O painel nao substitui a API. Ele melhora a experiencia de avaliacao e operacao
 dos recursos implementados.
 
-## Fora de escopo nesta versao
+## Evolucoes fora do escopo obrigatorio nesta versao
 
-Alguns pontos ficam fora do escopo funcional atual:
+Os itens abaixo nao eram requisitos obrigatorios do case. Eles aparecem aqui
+como limites assumidos desta entrega e como caminhos naturais de evolucao:
 
 - autenticacao e autorizacao de usuarios finais;
 - controle multi-tenant;
@@ -286,9 +308,9 @@ Alguns pontos ficam fora do escopo funcional atual:
 - avaliacao automatica de qualidade das respostas geradas pelo LLM;
 - suporte local via Ollama como provedor padrao.
 
-Esses pontos podem ser evoluidos depois, mas nao impedem a avaliacao do case,
-porque os requisitos obrigatorios e varios diferenciais ja estao cobertos pela
-entrega atual.
+Esses pontos podem ser evoluidos depois, mas nao prejudicam a avaliacao do
+case, porque os requisitos obrigatorios foram entregues e varios diferenciais
+relevantes tambem ja fazem parte da solucao atual.
 
 ## Relacao com os proximos capitulos
 

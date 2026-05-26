@@ -1,6 +1,5 @@
 # Introducao
 
-> Status: aprovado
 
 ## Objetivo deste capitulo
 
