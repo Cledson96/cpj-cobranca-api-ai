@@ -82,6 +82,10 @@ def generate_pdf():
         # Converter markdown para HTML usando extensões adicionais
         html_content = markdown(processed_content, extensions=["extra"])
         
+        # Remover tag <code> de dentro de <pre> para evitar conflitos de estilo no xhtml2pdf
+        html_content = html_content.replace("</code></pre>", "</pre>")
+        html_content = re.sub(r"<pre><code[^>]*>", "<pre>", html_content)
+        
         chapters_html.append(f"""
         <div class="chapter-container">
             {html_content}
