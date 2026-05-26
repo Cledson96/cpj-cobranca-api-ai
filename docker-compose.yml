@@ -48,5 +48,20 @@ services:
       postgres:
         condition: service_healthy
 
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: cpj-cobranca-web
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000
+    depends_on:
+      api:
+        condition: service_started
+
 volumes:
   cpj_cobranca_postgres_data:

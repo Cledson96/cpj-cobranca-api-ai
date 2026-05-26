@@ -18,6 +18,7 @@ API do case técnico CPJ-Cobrança para revisão de código, validação de ader
 - **Histórico de execuções** — persistência em PostgreSQL via Prisma com steps e telemetria
 - **Suporte a cache** — hash da requisição + rate limiting integrado
 - **OpenAPI/Swagger UI** — docs interativos em `/docs`
+- **Painel admin Next.js** — console em `apps/web` para historico, prompts, modelos, custos, tokens e execucao guiada
 - **OpenRouter** — provedor LLM multi-modelo
 - **LangSmith** — tracing opcional (desligado por padrão)
 - **Webhook opcional** — callback ao concluir ou falhar execucoes de review/compliance/document/tests
@@ -39,6 +40,7 @@ Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementa
 | Testes     | Vitest                              |
 | Lint       | ESLint 9 (flat config)              |
 | Container  | Docker + Compose                    |
+| Frontend   | Next.js 16 + React 19 + Ant Design 6 |
 
 ## Decisoes tecnicas
 
@@ -74,15 +76,19 @@ npx prisma migrate dev --name init
 
 # 5. Iniciar servidor em modo dev
 npm run dev
+
+# 6. Em outro terminal, iniciar o painel web
+npm run dev:web
 ```
 
-Acesse em `http://localhost:3000/health` e `http://localhost:3000/docs`.
+Acesse a API em `http://localhost:3000/health` e `http://localhost:3000/docs`.
+O painel web roda em `http://localhost:3001` e usa `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000` por padrao.
 Exemplos manuais completos estao em `requests/cpj-cobranca-api.http`.
 
 ## Docker (produção)
 
 ```bash
-# Build e start completo (API + PostgreSQL)
+# Build e start completo (API + PostgreSQL + painel web)
 docker compose up --build -d
 
 # Ver logs
@@ -108,6 +114,7 @@ docker compose logs -f api
 | POST   | `/api/v1/batch`    | Executa varios fluxos em sequencia     |
 | GET    | `/api/v1/history`   | Lista últimas execuções            |
 | GET    | `/api/v1/history/:id` | Detalhes de uma execução         |
+| GET    | `/api/v1/analytics/usage` | Agrega gastos e consumo de tokens |
 | GET    | `/api/v1/prompts` | Lista versoes de prompt por fluxo |
 | GET    | `/api/v1/prompts/:flowType/active` | Busca a versao ativa do fluxo |
 | GET    | `/api/v1/prompts/:flowType/:version` | Busca uma versao especifica |

@@ -17,6 +17,7 @@ export class HistoryRoutes {
     app.get(
       "/api/v1/history",
       {
+        attachValidation: true,
         schema: historyListRouteDocs,
       },
       controller.listLatest.bind(controller),

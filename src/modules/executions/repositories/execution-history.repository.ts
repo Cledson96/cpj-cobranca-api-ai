@@ -1,4 +1,5 @@
 import { toSaoPauloIso } from "@shared";
+import type { HistoryListQuery } from "@shared";
 import type {
   PrismaExecutionDelegate,
   ReviewExecution,
@@ -29,10 +30,13 @@ export class ExecutionHistoryRepository {
     return execution ? mapExecutionDetail(execution) : null;
   }
 
-  async listLatest(take = 20): Promise<ReviewExecutionListItem[]> {
+  async listLatest(input: number | HistoryListQuery = 20): Promise<ReviewExecutionListItem[]> {
+    const options = typeof input === "number" ? { limit: input } : input;
     const executions = await this.prisma.execution.findMany({
       orderBy: { createdAt: "desc" },
-      take,
+      take: options.limit ?? 20,
+      ...createCursorArgs(options.cursor),
+      ...createWhereArgs(options),
       select: {
         id: true,
         createdAt: true,
@@ -56,6 +60,50 @@ export class ExecutionHistoryRepository {
 
     return executions.map(mapExecutionListItem);
   }
+}
+
+function createCursorArgs(cursor?: string) {
+  if (!cursor) {
+    return {};
+  }
+
+  return {
+    cursor: { id: cursor },
+    skip: 1,
+  };
+}
+
+function createWhereArgs(input: HistoryListQuery) {
+  const where: Record<string, unknown> = {};
+
+  if (input.flow_type) {
+    where.flowType = input.flow_type;
+  }
+
+  if (input.status) {
+    where.status = input.status;
+  }
+
+  if (input.cache_hit !== undefined) {
+    where.cacheHit = input.cache_hit;
+  }
+
+  if (input.from || input.to) {
+    where.createdAt = {
+      ...(input.from ? { gte: new Date(input.from) } : {}),
+      ...(input.to ? { lte: new Date(input.to) } : {}),
+    };
+  }
+
+  if (input.model) {
+    where.telemetry = {
+      is: {
+        modelRequested: input.model,
+      },
+    };
+  }
+
+  return Object.keys(where).length > 0 ? { where } : {};
 }
 
 function mapExecutionDetail(execution: ReviewExecutionRecord): ReviewExecution {

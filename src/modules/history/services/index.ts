@@ -1,25 +1,37 @@
 import { GenericError, NotFoundError } from "@/infrastructure/errors";
 import type { ReviewExecution, ReviewExecutionListItem } from "@/modules/executions";
-import type { HistoryDetail, HistoryListResponse } from "@shared";
+import type { HistoryDetail, HistoryListQuery, HistoryListResponse } from "@shared";
 
 export type HistoryRepository = {
-  listLatest(take?: number): Promise<ReviewExecutionListItem[]>;
+  listLatest(input?: number | HistoryListQuery): Promise<ReviewExecutionListItem[]>;
   findById(id: string): Promise<ReviewExecution | null>;
 };
 
 export interface HistoryService {
-  listLatest(): Promise<HistoryListResponse>;
+  listLatest(input?: HistoryListQuery): Promise<HistoryListResponse>;
   findById(id: string): Promise<HistoryDetail | null>;
 }
 
 export class DefaultHistoryService implements HistoryService {
   constructor(private readonly repository?: HistoryRepository) {}
 
-  async listLatest(): Promise<HistoryListResponse> {
+  async listLatest(input: HistoryListQuery = { limit: 20 }): Promise<HistoryListResponse> {
     const repository = this.getRepository();
-    const items = await repository.listLatest();
+    const limit = input.limit ?? 20;
+    const records = await repository.listLatest({
+      ...input,
+      limit: limit + 1,
+    });
+    const items = records.slice(0, limit);
+    const nextItem = records.length > limit ? items.at(-1) : null;
 
-    return { items };
+    return {
+      items,
+      page: {
+        limit,
+        next_cursor: nextItem?.id ?? null,
+      },
+    };
   }
 
   async findById(id: string): Promise<HistoryDetail | null> {

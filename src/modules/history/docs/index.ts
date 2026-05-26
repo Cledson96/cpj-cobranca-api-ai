@@ -1,6 +1,7 @@
 import {
   historyDetailParamsSchema,
   historyDetailSchema,
+  historyListQuerySchema,
   historyListResponseSchema,
 } from "@shared";
 import { toOpenApiSchema } from "@/infrastructure/openapi";
@@ -19,6 +20,7 @@ export const historyListRouteDocs = {
   summary: "Lista execucoes recentes",
   description: "Retorna execucoes recentes persistidas dos fluxos do agente.",
   tags: ["History"],
+  querystring: toOpenApiSchema(historyListQuerySchema),
   response: {
     200: {
       description: "Historico retornado com sucesso",

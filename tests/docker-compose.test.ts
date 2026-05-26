@@ -18,4 +18,13 @@ describe("docker-compose.yml", () => {
 
     expect(compose).toContain('WEBHOOK_CALLBACK_URL: "${WEBHOOK_CALLBACK_URL:-}"');
   });
+
+  it("define painel web Next.js na porta 3001", () => {
+    const compose = readFileSync("docker-compose.yml", "utf8");
+
+    expect(compose).toContain("web:");
+    expect(compose).toContain("dockerfile: apps/web/Dockerfile");
+    expect(compose).toContain('"3001:3001"');
+    expect(compose).toContain("NEXT_PUBLIC_API_BASE_URL: http://localhost:3000");
+  });
 });

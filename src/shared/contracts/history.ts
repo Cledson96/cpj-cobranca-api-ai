@@ -1,7 +1,34 @@
 import { z } from "zod";
+import { executionFlowTypeSchema } from "./flow-types";
 
 const nonEmptyString = z.string().trim().min(1);
 const nullableNumber = z.number().nullable();
+const dateString = z.string().trim().refine((value) => !Number.isNaN(Date.parse(value)), {
+  message: "Data invalida.",
+});
+const queryBoolean = z.preprocess((value) => {
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  return value;
+}, z.boolean());
+
+export const historyListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: nonEmptyString.optional(),
+  flow_type: executionFlowTypeSchema.optional(),
+  status: z.enum(["pending", "success", "failed"]).optional(),
+  model: nonEmptyString.optional(),
+  from: dateString.optional(),
+  to: dateString.optional(),
+  cache_hit: queryBoolean.optional(),
+});
+export type HistoryListQuery = z.infer<typeof historyListQuerySchema>;
 
 export const historyTelemetrySchema = z.object({
   provider: nonEmptyString,
@@ -54,6 +81,10 @@ export type HistoryListItem = z.infer<typeof historyListItemSchema>;
 
 export const historyListResponseSchema = z.object({
   items: z.array(historyListItemSchema),
+  page: z.object({
+    limit: z.number().int().min(1),
+    next_cursor: z.string().nullable(),
+  }),
 });
 export type HistoryListResponse = z.infer<typeof historyListResponseSchema>;
 

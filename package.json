@@ -2,6 +2,9 @@
   "name": "cpj-cobranca-api-ai",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
   "description": "API do case CPJ-Cobranca com agente de IA, Fastify, LangGraph, OpenRouter e LangSmith.",
   "type": "module",
   "prisma": {
@@ -10,9 +13,12 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:web": "npm run dev --workspace apps/web",
     "build": "tsup src/server.ts --format esm --platform node --target node22 --out-dir dist --clean",
+    "build:web": "npm run build --workspace apps/web",
     "start": "node dist/server.js",
     "test": "vitest run",
+    "test:web": "npm run test --workspace apps/web",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",

@@ -55,6 +55,44 @@ describe("ExecutionHistoryRepository", () => {
     });
   });
 
+  it("aplica filtros, cursor e limite ao listar execucoes", async () => {
+    const { prisma, repository } = createRepository();
+    prisma.execution.findMany.mockResolvedValue([]);
+
+    await repository.listLatest({
+      limit: 11,
+      cursor: "execution-cursor",
+      flow_type: "review",
+      status: "success",
+      model: "openai/gpt-4o-mini",
+      from: "2026-05-01T00:00:00.000Z",
+      to: "2026-05-31T23:59:59.000Z",
+      cache_hit: false,
+    });
+
+    expect(prisma.execution.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: "desc" },
+      take: 11,
+      cursor: { id: "execution-cursor" },
+      skip: 1,
+      where: {
+        flowType: "review",
+        status: "success",
+        cacheHit: false,
+        createdAt: {
+          gte: new Date("2026-05-01T00:00:00.000Z"),
+          lte: new Date("2026-05-31T23:59:59.000Z"),
+        },
+        telemetry: {
+          is: {
+            modelRequested: "openai/gpt-4o-mini",
+          },
+        },
+      },
+      select: expect.any(Object),
+    });
+  });
+
   it("busca detalhe por id sem restringir flowType", async () => {
     const { prisma, repository } = createRepository();
     prisma.execution.findUnique.mockResolvedValue({

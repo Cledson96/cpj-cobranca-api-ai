@@ -73,6 +73,12 @@ describe("OpenAPI", () => {
             summary: expect.any(String),
           },
         },
+        "/api/v1/analytics/usage": {
+          get: {
+            tags: ["Analytics"],
+            summary: expect.any(String),
+          },
+        },
       },
     });
 

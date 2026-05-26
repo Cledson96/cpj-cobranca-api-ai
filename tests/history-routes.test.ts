@@ -80,12 +80,16 @@ function createApp(historyService: HistoryService) {
 
 describe("HistoryRoutes", () => {
   it("lista as ultimas execucoes", async () => {
-    const historyService: HistoryService = {
-      listLatest: vi.fn().mockResolvedValue({
-        items: [historyItem],
-      }),
-      findById: vi.fn(),
-    };
+      const historyService: HistoryService = {
+        listLatest: vi.fn().mockResolvedValue({
+          items: [historyItem],
+          page: {
+            limit: 20,
+            next_cursor: null,
+          },
+        }),
+        findById: vi.fn(),
+      };
     const app = createApp(historyService);
 
     const response = await app.inject({
@@ -96,8 +100,76 @@ describe("HistoryRoutes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       items: [historyItem],
+      page: {
+        limit: 20,
+        next_cursor: null,
+      },
     });
-    expect(historyService.listLatest).toHaveBeenCalledWith();
+    expect(historyService.listLatest).toHaveBeenCalledWith({
+      limit: 20,
+    });
+
+    await app.close();
+  });
+
+  it("lista execucoes com filtros e paginacao por cursor", async () => {
+    const historyService: HistoryService = {
+      listLatest: vi.fn().mockResolvedValue({
+        items: [historyItem],
+        page: {
+          limit: 10,
+          next_cursor: "execution-1",
+        },
+      }),
+      findById: vi.fn(),
+    };
+    const app = createApp(historyService);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/history?limit=10&cursor=execution-0&flow_type=review&status=success&model=openai%2Fgpt-4o-mini&from=2026-05-01T00%3A00%3A00.000Z&to=2026-05-31T23%3A59%3A59.000Z&cache_hit=false",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [historyItem],
+      page: {
+        limit: 10,
+        next_cursor: "execution-1",
+      },
+    });
+    expect(historyService.listLatest).toHaveBeenCalledWith({
+      limit: 10,
+      cursor: "execution-0",
+      flow_type: "review",
+      status: "success",
+      model: "openai/gpt-4o-mini",
+      from: "2026-05-01T00:00:00.000Z",
+      to: "2026-05-31T23:59:59.000Z",
+      cache_hit: false,
+    });
+
+    await app.close();
+  });
+
+  it("retorna 400 para query invalida de historico", async () => {
+    const historyService: HistoryService = {
+      listLatest: vi.fn(),
+      findById: vi.fn(),
+    };
+    const app = createApp(historyService);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/history?limit=0&flow_type=unknown",
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "bad_request",
+      message: "Query invalida para historico.",
+    });
+    expect(historyService.listLatest).not.toHaveBeenCalled();
 
     await app.close();
   });

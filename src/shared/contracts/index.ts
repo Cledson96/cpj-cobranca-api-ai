@@ -1,3 +1,4 @@
+export * from "./analytics";
 export * from "./batch";
 export * from "./compliance";
 export * from "./document";
