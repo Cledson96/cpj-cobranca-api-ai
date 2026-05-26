@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/package.json
+COPY prisma/ ./prisma/
 RUN npm ci
 
 FROM deps AS builder
