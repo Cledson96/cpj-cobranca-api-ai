@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Layout, Menu, Typography } from "antd";
+import { Badge, Layout, Menu, Space, Typography } from "antd";
 
 const { Header, Content, Sider } = Layout;
 
@@ -24,14 +24,29 @@ export function AppShell({ children }: { children: ReactNode }) {
     <Layout className="app-shell">
       <Sider width={264} className="app-shell__sider" breakpoint="lg" collapsedWidth={0}>
         <div className="brand-block">
-          <Typography.Text className="brand-block__eyebrow">CPJ Cobranca</Typography.Text>
-          <Typography.Title level={3}>AI Console</Typography.Title>
+          <span className="brand-block__mark" aria-hidden="true">
+            AI
+          </span>
+          <div>
+            <Typography.Text className="brand-block__eyebrow">CPJ Cobranca</Typography.Text>
+            <Typography.Title level={3}>AI Console</Typography.Title>
+          </div>
         </div>
         <Menu mode="inline" selectedKeys={[selected]} items={items} className="app-shell__menu" />
+        <div className="sider-status">
+          <Typography.Text>Ambiente interno</Typography.Text>
+          <Typography.Text className="sider-status__value">Sem login nesta versao</Typography.Text>
+        </div>
       </Sider>
       <Layout className="app-shell__main">
         <Header className="app-shell__header">
-          <Typography.Text>Operacao interna sem login - API base configuravel por ambiente</Typography.Text>
+          <div className="topbar">
+            <Space orientation="vertical" size={0}>
+              <Typography.Text className="topbar__eyebrow">Console tecnico</Typography.Text>
+              <Typography.Text className="topbar__text">Operacao interna sem login - API base configuravel por ambiente</Typography.Text>
+            </Space>
+            <Badge status="processing" text="Painel online" />
+          </div>
         </Header>
         <Content className="app-shell__content">{children}</Content>
       </Layout>

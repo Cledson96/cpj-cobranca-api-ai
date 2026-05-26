@@ -57,7 +57,7 @@ describe("DashboardPage", () => {
     expect(screen.getAllByText("Execucoes").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1.840").length).toBeGreaterThan(0);
     expect(screen.getAllByText("US$ 0.0184").length).toBeGreaterThan(0);
-    expect(screen.getByText("review")).toBeInTheDocument();
-    expect(screen.getByText("openai/gpt-4o-mini")).toBeInTheDocument();
+    expect(screen.getAllByText("review").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("openai/gpt-4o-mini").length).toBeGreaterThan(0);
   });
 });

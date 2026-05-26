@@ -10,12 +10,17 @@ export function Providers({ children }: { children: ReactNode }) {
       locale={ptBR}
       theme={{
         token: {
-          colorPrimary: "#1f6feb",
-          colorSuccess: "#1f8f5f",
-          colorWarning: "#b7791f",
-          colorError: "#c24141",
-          borderRadius: 14,
-          fontFamily: "\"IBM Plex Sans\", \"Aptos\", \"Segoe UI\", sans-serif",
+          colorPrimary: "#0f766e",
+          colorSuccess: "#16a34a",
+          colorWarning: "#d97706",
+          colorError: "#e11d48",
+          colorInfo: "#0284c7",
+          borderRadius: 18,
+          colorText: "#15202b",
+          colorTextSecondary: "#65758b",
+          colorBgContainer: "rgba(255, 255, 255, 0.86)",
+          colorBorderSecondary: "rgba(21, 32, 43, 0.08)",
+          fontFamily: "\"Space Grotesk\", \"IBM Plex Sans\", \"Aptos\", \"Segoe UI\", sans-serif",
         },
         components: {
           Layout: {
@@ -24,7 +29,16 @@ export function Providers({ children }: { children: ReactNode }) {
             bodyBg: "transparent",
           },
           Card: {
-            borderRadiusLG: 18,
+            borderRadiusLG: 24,
+            boxShadowTertiary: "0 20px 60px rgba(15, 23, 42, 0.10)",
+          },
+          Table: {
+            headerBg: "rgba(248, 250, 252, 0.72)",
+            rowHoverBg: "rgba(20, 184, 166, 0.07)",
+          },
+          Menu: {
+            itemBorderRadius: 18,
+            itemHeight: 46,
           },
         },
       }}
