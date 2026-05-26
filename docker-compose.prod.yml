@@ -8,8 +8,6 @@ services:
   postgres:
     environment:
       POSTGRES_PASSWORD: "cpj_c0branca_pr0d_2026"
-    ports:
-      - "127.0.0.1:5432:5432"
 
   api:
     ports:
