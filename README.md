@@ -50,7 +50,7 @@ Os fluxos `review`, `compliance`, `document`, `tests` e `batch` estao implementa
 - **LangGraph.js + LangChain.js**: modela os fluxos como grafos explícitos, separando tools determinísticas, agentes especialistas, agregação e persistência de steps.
 - **OpenRouter**: mantém integração de chat e structured output, enquanto a escolha do modelo fica centralizada em catálogo persistido no banco.
 - **LangSmith opcional**: tracing fica disponível por configuração, sem bloquear execução local ou Docker quando não houver chave.
-- **Docker Compose**: sobe API e banco com migrations aplicadas antes do start da API.
+- **Docker Compose**: sobe API e banco com migrations e seed inicial aplicados antes do start da API.
 
 ## Custo estimado
 
@@ -71,8 +71,9 @@ docker compose up -d postgres
 cp .env.example .env
 # Edite .env e adicione OPENROUTER_API_KEY
 
-# 4. Rodar migrations
+# 4. Rodar migrations e seed inicial
 npx prisma migrate dev --name init
+npx prisma db seed
 
 # 5. Iniciar servidor em modo dev
 npm run dev
@@ -88,6 +89,10 @@ Exemplos manuais completos estao em `requests/cpj-cobranca-api.http`.
 ## Docker (produção)
 
 ```bash
+# Preparar variaveis de ambiente
+cp .env.example .env
+# Edite .env e adicione OPENROUTER_API_KEY
+
 # Build e start completo (API + PostgreSQL + painel web)
 docker compose up --build -d
 
@@ -97,7 +102,7 @@ docker compose logs -f api
 
 > **Atenção:** a `DATABASE_URL` em Docker aponta para o serviço `postgres` automaticamente.  
 > Em ambiente local (sem Docker), use `localhost`. Veja `.env.example`.
-> O container da API executa `prisma migrate deploy` antes de iniciar o servidor.
+> O container da API executa `prisma migrate deploy` e `prisma db seed` antes de iniciar o servidor.
 
 ## Endpoints
 
@@ -134,8 +139,26 @@ docker compose logs -f api
   "code": "function sum(a, b) { return a + b; }",
   "language": "typescript",
   "context": "Descrição opcional do contexto",
-  "prompt_version": 2,
   "model": "openai/gpt-4o-mini"
+}
+```
+
+Resposta:
+
+```json
+{
+  "overall_quality": "needs_improvement",
+  "score": 7,
+  "issues": [
+    {
+      "severity": "medium",
+      "line_hint": "linha 2",
+      "description": "A funcao nao valida os tipos de entrada antes de somar.",
+      "suggestion": "Valide ou tipifique os parametros de entrada conforme o contrato esperado."
+    }
+  ],
+  "positives": ["Funcao pequena e facil de entender."],
+  "summary": "O codigo e simples, mas precisa de validacao ou contrato de tipos mais claro."
 }
 ```
 
@@ -166,7 +189,6 @@ Usa o mesmo payload do `/api/v1/review` e responde como `text/event-stream`, emi
   "task_description": "Permitir renegociacao apenas para contratos ativos e registrar auditoria.",
   "code": "if (contract.active) { renegotiate(contract); audit(contract.id); }",
   "language": "typescript",
-  "prompt_version": 3,
   "model": "deepseek/deepseek-v4-flash"
 }
 ```
@@ -191,7 +213,6 @@ Resposta:
   "code": "export function charge(amount: number) { return amount > 0; }",
   "language": "typescript",
   "doc_type": "technical",
-  "prompt_version": 2,
   "model": "openai/gpt-4o-mini"
 }
 ```
@@ -230,7 +251,6 @@ Resposta:
   "code": "export function charge(amount: number) { return amount > 0; }",
   "language": "typescript",
   "test_framework": "vitest",
-  "prompt_version": 5,
   "model": "deepseek/deepseek-v4-flash"
 }
 ```
@@ -259,7 +279,6 @@ Resposta:
   "github_pull_request_url": "https://github.com/org/repo/pull/123",
   "base_branch": "main",
   "test_framework": "vitest",
-  "prompt_version": 5,
   "model": "openai/gpt-4o-mini"
 }
 ```

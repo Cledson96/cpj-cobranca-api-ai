@@ -23,4 +23,8 @@ describe("requests manuais", () => {
     expect(requests).toContain('"test_framework"');
     expect(requests).not.toContain('"include_mocks"');
   });
+
+  it("nao aponta para prompt_version que o seed inicial nao cria", () => {
+    expect(requests).not.toMatch(/"prompt_version":\s*(2|3|5)/);
+  });
 });

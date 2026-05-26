@@ -19,9 +19,22 @@ export function formatDuration(value: number | null | undefined): string {
   return `${(duration / 1000).toFixed(1)} s`;
 }
 
-export function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) {
+    return "-";
+  }
+
+  try {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) {
+      return "-";
+    }
+
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(date);
+  } catch {
+    return "-";
+  }
 }

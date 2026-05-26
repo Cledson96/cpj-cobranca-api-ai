@@ -35,6 +35,12 @@ describe("README final", () => {
     expect(readme).not.toContain('"detail_level": "standard"');
   });
 
+  it("documenta response do review e nao usa prompt_version inexistente nos exemplos", () => {
+    expect(readme).toContain('"overall_quality": "needs_improvement"');
+    expect(readme).toContain('"line_hint": "linha 2"');
+    expect(readme).not.toMatch(/"prompt_version":\s*(2|3|5)/);
+  });
+
   it("documenta batch com metadados por item", () => {
     expect(readme).toContain('"execution_id": "execution-review-1"');
     expect(readme).toContain('"cache_hit": false');

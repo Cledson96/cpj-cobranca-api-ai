@@ -24,6 +24,20 @@ describe("Dockerfile", () => {
     expect(dockerfile).toContain("node dist/server.js");
   });
 
+  it("executa seed inicial antes de iniciar a API no container", () => {
+    const dockerfile = readFileSync("Dockerfile", "utf8");
+
+    expect(dockerfile).toContain("prisma db seed");
+    expect(dockerfile).toContain("COPY --from=builder /app/src ./src");
+    expect(dockerfile).toContain("COPY --from=builder /app/tsconfig.json ./tsconfig.json");
+    expect(dockerfile.indexOf("prisma migrate deploy")).toBeLessThan(
+      dockerfile.indexOf("prisma db seed"),
+    );
+    expect(dockerfile.indexOf("prisma db seed")).toBeLessThan(
+      dockerfile.indexOf("node dist/server.js"),
+    );
+  });
+
   it("disponibiliza schema Prisma antes do npm ci executar o postinstall", () => {
     const dockerfile = readFileSync("Dockerfile", "utf8");
 

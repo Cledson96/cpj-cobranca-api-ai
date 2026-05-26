@@ -19,7 +19,7 @@ Content-Type: application/json
   "code": "function calculateTotal(items: { price: number; quantity: number }[]): number {\n  return items.reduce((sum, item) => {\n    return sum + item.price * item.quantity;\n  }, 0);\n}",
   "language": "typescript",
   "context": "Funcao de calculo de total em carrinho de compras",
-  "prompt_version": 2
+  "model": "openai/gpt-4o-mini"
 }
 
 ### -----------------------
@@ -59,6 +59,32 @@ Content-Type: application/json
 }
 
 ### -----------------------
+### POST Pull Request Review - sem Jira
+### -----------------------
+POST {{baseUrl}}/api/v1/review/pull-request
+Content-Type: application/json
+
+{
+  "github_pull_request_url": "https://github.com/org/repo/pull/123",
+  "base_branch": "main",
+  "model": "openai/gpt-4o-mini"
+}
+
+### -----------------------
+### POST Pull Request Review - com Jira
+### -----------------------
+POST {{baseUrl}}/api/v1/review/pull-request
+Content-Type: application/json
+
+{
+  "github_pull_request_url": "https://github.com/org/repo/pull/123",
+  "jira_issue_key": "CPJ-123",
+  "base_branch": "main",
+  "prompt_version": 1,
+  "model": "openai/gpt-4o-mini"
+}
+
+### -----------------------
 ### POST Compliance
 ### -----------------------
 POST {{baseUrl}}/api/v1/compliance
@@ -68,7 +94,7 @@ Content-Type: application/json
   "task_description": "Permitir renegociacao apenas para contratos ativos e registrar auditoria.",
   "code": "if (contract.active) { renegotiate(contract); audit(contract.id); }",
   "language": "typescript",
-  "prompt_version": 3
+  "model": "deepseek/deepseek-v4-flash"
 }
 
 ### -----------------------
@@ -81,7 +107,7 @@ Content-Type: application/json
   "code": "export async function chargeCustomer(customerId: string, amount: number) { if (amount <= 0) throw new Error('invalid amount'); await repository.save({ customerId, amount }); return { approved: true }; }",
   "language": "typescript",
   "doc_type": "technical",
-  "prompt_version": 2
+  "model": "openai/gpt-4o-mini"
 }
 
 ### -----------------------
@@ -94,7 +120,20 @@ Content-Type: application/json
   "code": "export function charge(amount: number) { if (amount <= 0) throw new Error('invalid amount'); return amount > 0; }",
   "language": "typescript",
   "test_framework": "vitest",
-  "prompt_version": 5
+  "model": "deepseek/deepseek-v4-flash"
+}
+
+### -----------------------
+### POST Tests from Pull Request
+### -----------------------
+POST {{baseUrl}}/api/v1/tests/pull-request
+Content-Type: application/json
+
+{
+  "github_pull_request_url": "https://github.com/org/repo/pull/123",
+  "base_branch": "main",
+  "test_framework": "vitest",
+  "model": "openai/gpt-4o-mini"
 }
 
 ### -----------------------
@@ -128,6 +167,41 @@ Content-Type: application/json
 ### POST Activate Prompt Version
 ### -----------------------
 POST {{baseUrl}}/api/v1/prompts/document/2/activate
+
+### -----------------------
+### GET Models
+### -----------------------
+GET {{baseUrl}}/api/v1/models
+
+### -----------------------
+### GET Default Model
+### -----------------------
+GET {{baseUrl}}/api/v1/models/default
+
+### -----------------------
+### POST Create Model
+### -----------------------
+POST {{baseUrl}}/api/v1/models
+Content-Type: application/json
+
+{
+  "name": "anthropic/claude-3.5-haiku"
+}
+
+### -----------------------
+### PATCH Model
+### -----------------------
+PATCH {{baseUrl}}/api/v1/models/00000000-0000-0000-0000-000000000000
+Content-Type: application/json
+
+{
+  "is_default": true
+}
+
+### -----------------------
+### DELETE Model
+### -----------------------
+DELETE {{baseUrl}}/api/v1/models/00000000-0000-0000-0000-000000000000
 
 ### -----------------------
 ### POST Batch

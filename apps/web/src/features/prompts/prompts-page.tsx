@@ -29,11 +29,16 @@ export function PromptsPage() {
     try {
       const [list, activePrompt] = await Promise.all([
         api.listPrompts(nextFlow),
-        api.getActivePrompt(nextFlow),
+        api.getActivePrompt(nextFlow).catch(() => null),
       ]);
       setItems(list.items);
       setActive(activePrompt);
-      setBlocks(Object.fromEntries(activePrompt.blocks.map((block) => [block.block_key, block.system_prompt])));
+      if (activePrompt) {
+        setBlocks(Object.fromEntries(activePrompt.blocks.map((block) => [block.block_key, block.system_prompt])));
+      } else {
+        const keys = blockKeysByFlow[nextFlow] ?? [];
+        setBlocks(Object.fromEntries(keys.map((k) => [k, ""])));
+      }
       setName("");
       setError(null);
     } catch (reason) {

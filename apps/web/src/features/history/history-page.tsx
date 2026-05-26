@@ -47,8 +47,13 @@ export function HistoryPage() {
   };
 
   const openDetail = async (id: string) => {
-    const output = await api.getHistoryDetail(id);
-    setDetail(output);
+    try {
+      const output = await api.getHistoryDetail(id);
+      setDetail(output);
+      setError(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Falha ao carregar detalhes da execucao.");
+    }
   };
 
   return (
