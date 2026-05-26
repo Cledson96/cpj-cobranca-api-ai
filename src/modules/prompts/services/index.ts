@@ -67,7 +67,7 @@ export type PromptVersionRepository = {
 };
 
 export class DefaultPromptsService implements PromptsService, PromptRuntimeResolver {
-  constructor(private readonly repository?: PromptVersionRepository) {}
+  constructor(private readonly repository?: PromptVersionRepository) { }
 
   async list(input: PromptVersionListInput): Promise<PromptVersionListResponse> {
     const records = await this.getRepository().list(input);
@@ -275,26 +275,35 @@ export class LegacyPromptRuntimeResolver implements PromptRuntimeResolver {
 export function defaultPullRequestReviewPrompts(): PullRequestReviewRuntimePromptSet {
   return {
     code_standard: [
-      "Voce avalia se um pull request segue os padroes corporativos TR.",
-      "Use os guias de padrao recebidos como fonte principal.",
-      "Retorne achados objetivos com arquivo, linha quando possivel, descricao e sugestao.",
+      "Voce e um revisor senior. Avalie se o PR segue os padroes corporativos (Clean Code, SOLID, DDD).",
+      "Use os guias de padrao recebidos como fonte da verdade.",
+      "Identifique violações objetivas: nomenclatura, complexidade desnecessaria, falta de modularizacao ou tratamento de erro omisso.",
+      "Retorne achados estruturados com arquivo, linha (se disponivel), descricao tecnica e sugestao concreta de refatoracao."
     ].join("\n"),
+
     jira_criteria: [
-      "Voce compara o diff do pull request com os criterios de aceite do card Jira.",
-      "Avalie somente os criterios informados e cite evidencias concretas do codigo alterado.",
+      "Voce e o especialista em requisitos. Compare o diff do PR com os criterios de aceite (AC) do Jira.",
+      "Verifique: a logica implementada cobre todos os cenarios solicitados? Houve cobertura de fluxos de erro?",
+      "Cite o trecho exato do codigo que atende (ou falha em atender) a cada criterio do card."
     ].join("\n"),
+
     project_consistency: [
-      "Voce avalia se o pull request esta condizente com o estilo, arquitetura e padroes ja existentes no projeto.",
-      "Compare o diff com os arquivos de contexto enviados.",
+      "Voce e o guardiao da arquitetura. Avalie se o PR respeita o estilo, padroes de pastas, injecao de dependencias e arquitetura do CPJ-Cobranca.",
+      "Compare o diff com a estrutura de pastas e contratos existentes no projeto.",
+      "Evite duplicacao de logica se ela ja existir num modulo compartilhado (shared/)."
     ].join("\n"),
+
     security: [
-      "Voce faz uma revisao de seguranca por IA no pull request.",
-      "Procure vulnerabilidades, vazamento de segredo, injecao, autorizacao ausente, validacao insuficiente e exposicao indevida de dados.",
+      "Voce e um especialista em seguranca AppSec. Analise vulnerabilidades como SQL Injection, XSS, Path Traversal, ou exposicao de logs sensiveis (LGPD).",
+      "Verifique se o dado de entrada (req.body/params) esta sanitizado antes de qualquer operacao.",
+      "Se identificar segredo hardcoded ou log de CPF/Authorization, classifique como CRITICAL."
     ].join("\n"),
+
     aggregator: [
-      "Voce consolida as analises de padrao, Jira, consistencia do projeto e seguranca em um relatorio JSON final.",
-      "Use verdict approved apenas quando nao houver achados relevantes.",
-      "Use changes_requested quando houver falhas de seguranca, criterios nao atendidos ou divergencias importantes de padrao.",
+      "Voce e o Tech Lead. Consolide as analises em um relatorio JSON final acionavel.",
+      "Defina o 'verdict' como 'approved' APENAS se nao houver nenhum achado crítico ou médio pendente.",
+      "Use 'changes_requested' para qualquer falha de seguranca, regra de negocio ignorada ou divergencia arquitetural grave.",
+      "Resuma as prioridades: o que deve ser corrigido ANTES do merge e o que pode ser uma sugestao técnica para o futuro."
     ].join("\n"),
   };
 }
